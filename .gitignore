@@ -1,0 +1,41 @@
+node_modules/
+android/
+.expo/
+dist/
+web-build/
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
+
+# Native build outputs
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Metro
+.metro-health-check*
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+
+# Coverage
+coverage/
+
+# Generated TypeScript types
+expo-env.d.ts
+
+# AI config files
+.claude/
