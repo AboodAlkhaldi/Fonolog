@@ -1,6 +1,6 @@
-export type UserRole = 'student' | 'admin'
+export type UserRole = 'student' | 'teacher' | 'admin'
 
-export type SubscriptionStatus = 'free' | 'trial' | 'student' | 'expert'
+export type SubscriptionStatus = 'free' | 'trial' | 'active' | 'student' | 'expert'
 
 export interface Profile {
   id:                  string
@@ -50,6 +50,11 @@ export type EntitlementKey =
 
 export const SUBSCRIPTION_ENTITLEMENTS: Record<SubscriptionStatus, EntitlementKey[]> = {
   free: [],
+  active: [
+    'all_categories', 'all_modules', 'learn_mode', 'revision_mode',
+    'milestone_tests', 'tts_all_words', 'microphone', 'full_character',
+    'unlimited_history', 'unlimited_pdf',
+  ],
   trial: [
     'all_categories', 'all_modules', 'learn_mode', 'revision_mode',
     'milestone_tests', 'tts_all_words', 'microphone', 'full_character',

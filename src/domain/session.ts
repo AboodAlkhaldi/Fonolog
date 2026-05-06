@@ -55,6 +55,9 @@ export async function generateSession(
     throw new Error('[domain] no words match the selection');
   }
 
+  // Shuffle so each session draws a different subset/order from the pool.
+  words = shuffle(words);
+
   let questions = def.generator(words);
 
   if (opts.maxQuestions && questions.length > opts.maxQuestions) {
@@ -62,4 +65,13 @@ export async function generateSession(
   }
 
   return questions;
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
