@@ -39,7 +39,11 @@ export function PronunciationQuestion({ question, status, chosen, onChoose }: Pr
 
   return (
     <View style={styles.container}>
-      <Text style={styles.prompt}>Bu kelimeyi söyle:</Text>
+      {question.prompt ? (
+        <Text style={styles.prompt}>{question.prompt}</Text>
+      ) : (
+        <Text style={styles.prompt}>Bu kelimeyi söyle:</Text>
+      )}
 
       <View style={styles.card}>
         <Text style={styles.emoji}>{question.word.emoji}</Text>
@@ -61,13 +65,12 @@ export function PronunciationQuestion({ question, status, chosen, onChoose }: Pr
 
       {!revealed ? (
         <MicButton
-          expectedWord={question.word.word}
+          expectedWord={question.correct}
           onResult={handleResult}
           style={{ marginTop: theme.spacing[6] }}
         />
       ) : null}
 
-      {/* Skip button — child can move past if mic isn't working */}
       {!revealed ? (
         <Button
           label="Atla"

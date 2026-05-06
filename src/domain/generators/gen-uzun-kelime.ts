@@ -8,12 +8,13 @@ import { shuffle, qid } from './utils'
 export function genUzunKelime(words: Word[]): Question[] {
   const pairs: Question[] = []
   const shuffled = shuffle(words)
-  for (let i = 0; i < shuffled.length - 1 && pairs.length < 20; i++) {
+  // Step by 2 so no word appears in two adjacent pairs.
+  for (let i = 0; i + 1 < shuffled.length && pairs.length < 20; i += 2) {
     const a = shuffled[i], b = shuffled[i + 1]
     if (a.n === b.n) continue
     const correct = a.n > b.n ? a.word : b.word
     pairs.push({
-      id:      qid('uk', i),
+      id:      qid('uk', pairs.length),
       word:    a.n > b.n ? a : b,
       options: shuffle([a.word, b.word]),
       correct,

@@ -33,13 +33,13 @@ export default function AdminLayout() {
         title: 'Öğrenci',
         tabBarIcon: ({ color, size }) => <Ionicons name="happy-outline"  size={size} color={color} />,
       }} />
-      <Tabs.Screen name="content"      options={{
-        title: 'İçerik',
-        tabBarIcon: ({ color, size }) => <Ionicons name="library-outline" size={size} color={color} />,
-      }} />
       <Tabs.Screen name="analytics"    options={{
         title: 'Analiz',
         tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart-outline" size={size} color={color} />,
+      }} />
+      <Tabs.Screen name="content"      options={{
+        title: 'Veri Yönetimi',
+        tabBarIcon: ({ color, size }) => <Ionicons name="library-outline" size={size} color={color} />,
       }} />
       <Tabs.Screen name="settings"     options={{
         title: 'Ayarlar',
@@ -47,13 +47,7 @@ export default function AdminLayout() {
       }} />
 
       {/* Hidden detail screens — files exist on disk but should not appear as a tab. */}
-      <Tabs.Screen name="content/words"                       options={{ href: null }} />
-      <Tabs.Screen name="content/categories"                  options={{ href: null }} />
-      <Tabs.Screen name="content/characters"                  options={{ href: null }} />
-      <Tabs.Screen name="content/word/[id]"                   options={{ href: null }} />
-      <Tabs.Screen name="content/category/[id]"               options={{ href: null }} />
-      <Tabs.Screen name="content/character-edit/[type]/[id]"  options={{ href: null }} />
-      <Tabs.Screen name="user/[id]"                           options={{ href: null }} />
+      <Tabs.Screen name="user/[id]" options={{ href: null }} />
     </Tabs>
   );
 }

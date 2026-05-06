@@ -22,10 +22,19 @@ export default function TeacherSettings() {
     ? Math.max(0, differenceInCalendarDays(expires, new Date()))
     : null;
 
-  const onSignOut = () => Alert.alert('Çıkış', 'Hesabından çıkmak istediğinden emin misin?', [
-    { text: 'Vazgeç', style: 'cancel' },
-    { text: 'Çıkış',  style: 'destructive', onPress: signOut },
-  ]);
+  const onSignOut = () => {
+    if (impersonating) {
+      Alert.alert(
+        'Önizleme modundasın',
+        'Buradan çıkış yapamazsın. Üstteki sarı bantta yer alan "Çık" tuşuna bas.',
+      );
+      return;
+    }
+    Alert.alert('Çıkış', 'Hesabından çıkmak istediğinden emin misin?', [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Çıkış',  style: 'destructive', onPress: signOut },
+    ]);
+  };
 
   return (
     <Screen>

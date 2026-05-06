@@ -29,7 +29,7 @@ interface Props {
 export function BuilderQuestion({ question, status, chosen, onChoose }: Props) {
   const targetSyllables = question.word.syl;            // ['ka','lem']
   const tiles           = question.options ?? [];       // shuffled syllables
-  const expectedCount   = targetSyllables.length;
+  const expectedCount   = tiles.length;
   const revealed        = status === 'revealed';
 
   const [picked, setPicked] = useState<number[]>([]);   // tile indices, in order

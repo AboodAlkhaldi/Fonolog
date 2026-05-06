@@ -123,7 +123,13 @@ export default function SessionScreen() {
             chosen={lastChosen}
             onChoose={answer}
           />
-        ) : screenType === 'pronunciation' ? (
+        ) : (
+          screenType === 'pronunciation' ||
+          screenType === 'phoneme' ||
+          screenType === 'explore' ||
+          screenType === 'memory' ||
+          !question.options || question.options.length === 0
+        ) ? (
           <PronunciationQuestion
             question={question}
             status={qStatus}

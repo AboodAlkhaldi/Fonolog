@@ -9,13 +9,25 @@ import { theme } from '@/theme';
 export default function AdminSettings() {
   const profile = useAuth((s) => s.profile);
   const signOut = useAuth((s) => s.signOut);
+  const impersonating = useAuth((s) => s.impersonating);
+
 
   if (!profile) return null;
 
-  const onSignOut = () => Alert.alert('Çıkış', 'Hesabından çıkmak istediğinden emin misin?', [
-    { text: 'Vazgeç', style: 'cancel' },
-    { text: 'Çıkış',  style: 'destructive', onPress: signOut },
-  ]);
+  const onSignOut = () => {
+    if (impersonating) {
+      Alert.alert(
+        'Önizleme modundasın',
+        'Buradan çıkış yapamazsın. Üstteki sarı bantta yer alan "Çık" tuşuna bas.',
+      );
+      return;
+    }
+    Alert.alert('Çıkış', 'Hesabından çıkmak istediğinden emin misin?', [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Çıkış',  style: 'destructive', onPress: signOut },
+    ]);
+  };
+
 
   return (
     <Screen>

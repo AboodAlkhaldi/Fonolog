@@ -27,16 +27,31 @@ export default function NewAssignment() {
   const [title, setTitle] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
+    useEffect(() => {
+    if (!teacher) return;
     (async () => {
-      const [s, w] = await Promise.all([
-        supabase.from('profiles').select('id,full_name,child_avatar_emoji').eq('role','student').order('full_name'),
-        contentRepository.getAllWords(),
-      ]);
-      setStudents(s.data ?? []);
+      // Only load students LINKED to this teacher (RLS-friendly).
+      const { data: links } = await supabase
+        .from('teacher_students')
+        .select('student_id')
+        .eq('teacher_id', teacher.id);
+      const ids = (links ?? []).map((l: any) => l.student_id);
+      const w = await contentRepository.getAllWords();
+      if (ids.length === 0) {
+        setStudents([]);
+        setAllWords(w);
+        return;
+      }
+      const { data: s } = await supabase
+        .from('profiles')
+        .select('id,full_name,child_avatar_emoji')
+        .in('id', ids)
+        .order('full_name');
+      setStudents(s ?? []);
       setAllWords(w);
     })();
-  }, []);
+  }, [teacher?.id]);
+
 
   const submit = async () => {
     if (!teacher) return;

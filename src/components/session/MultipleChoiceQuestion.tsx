@@ -60,7 +60,7 @@ export function MultipleChoiceQuestion({
 
       {/* Options grid */}
       <View style={styles.grid}>
-        {(question.options ?? []).map((opt) => {
+        {(question.options ?? []).map((opt, idx) => {
           const isChosen  = chosen === opt;
           const isCorrect = opt === question.correct;
 
@@ -84,7 +84,7 @@ export function MultipleChoiceQuestion({
 
           return (
             <Pressable
-              key={opt}
+              key={`${opt}-${idx}`}
               onPress={() => onTilePress(opt)}
               accessibilityRole="button"
               accessibilityLabel={opt}

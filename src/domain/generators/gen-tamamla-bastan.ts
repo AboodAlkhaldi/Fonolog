@@ -9,18 +9,23 @@ export function genTamamlaBastan(words: Word[]): Question[] {
   const multi = words.filter(w => w.n >= 2)
   return shuffle(multi).slice(0, 20).map((word, i) => {
     const ending = word.syl[word.syl.length - 1]
-    const correct = word.word
-    const wrong = shuffle(multi.filter(w =>
-      w.word !== word.word &&
-      w.syl[w.syl.length - 1] !== ending
-    )).slice(0, 3).map(w => w.word)
-    if (wrong.length < 3) return null
+    const head   = word.syl.slice(0, -1).join('')   // e.g. "ka" for "kalem"
+    const distractors = shuffle(
+      multi.filter(w =>
+        w.word !== word.word &&
+        w.syl.slice(0, -1).join('') !== head
+      )
+    )
+      .map(w => w.syl.slice(0, -1).join(''))
+      .filter((h, idx, arr) => h.length > 0 && arr.indexOf(h) === idx)
+      .slice(0, 3)
+    if (distractors.length < 3) return null
     return {
       id:      qid('tb', i),
       word,
-      options: shuffle([correct, ...wrong]),
-      correct,
-      prompt:  `"___${ending}" — hangi kelime?`,
+      options: shuffle([head, ...distractors]),
+      correct: head,
+      prompt:  `"___${ending}" — eksik parçayı seç!`,
     }
   }).filter((q): q is NonNullable<typeof q> => q !== null) as Question[]
 }

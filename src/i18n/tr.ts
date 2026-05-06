@@ -146,6 +146,20 @@ const tr = {
     character: 'Karakter',
     profile:   'Profil',
   },
+    // ─── Learn / Session ───────────────────────────────
+  learn: {
+    title:           'Öğren',
+    chooseCategory:  'Bir oyun seç',
+  },
+  session: {
+    loading:      'Soru hazırlanıyor...',
+    error:        'Soru yüklenemedi.',
+    correct:      'Doğru!',
+    wrong:        'Yanlış',
+    next:         'Devam',
+    quit:         'Çık',
+    quitConfirm:  'Oturumdan çıkmak istediğine emin misin? İlerlemen kaydedilmeyecek.',
+  },
   profile: {
     title:        'Profil',
     accountInfo:  'Hesap Bilgileri',
