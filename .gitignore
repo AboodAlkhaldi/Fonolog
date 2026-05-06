@@ -39,3 +39,5 @@ expo-env.d.ts
 
 # AI config files
 .claude/
+
+temp/
