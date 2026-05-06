@@ -155,7 +155,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     familyTip:       '"Köpekbalığı mı uzun, kedi mi?" gibi sorular sorun. Uzunluğu fiziksel büyüklükle değil, ses uzunluğuyla ilişkilendirmeyi öğreniyorlar.',
     color:           '#0EA5E9',
     level:           2,
-    screenType:      'quiz',
+    screenType:      'audio-pair',
     generator:       genUzunKelime,
     requiresPremium: true,
   },

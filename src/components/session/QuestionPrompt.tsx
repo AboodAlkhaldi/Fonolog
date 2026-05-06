@@ -23,13 +23,25 @@ export function QuestionPrompt({
     return <EmojiCard emoji={question.word.emoji} />;
   }
 
-  // tamamla → big syllable text "ka___"
-  if (moduleId === 'tamamla' || moduleId === 'tamamlaBastan') {
+  // tamamla → "ka___" (show first syllable, blank the rest)
+  if (moduleId === 'tamamla') {
     const syllable = question.word.syl[0];
     return (
       <View style={styles.center}>
         <Text style={styles.syllableText}>
           {syllable}<Text style={styles.dim}>___</Text>
+        </Text>
+      </View>
+    );
+  }
+
+  // tamamlaBastan → "___ya" (show last syllable, blank the start — answer is the missing head)
+  if (moduleId === 'tamamlaBastan') {
+    const lastSyl = question.word.syl[question.word.syl.length - 1];
+    return (
+      <View style={styles.center}>
+        <Text style={styles.syllableText}>
+          <Text style={styles.dim}>___</Text>{lastSyl}
         </Text>
       </View>
     );

@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { differenceInCalendarDays } from 'date-fns';
 
-import { Screen, Button } from '@/components';
+import { Screen } from '@/components';
 import { useAuth } from '@/store/auth';
 import { supabase } from '@/lib/supabase';
 import { withPreviewPlaceholders } from '@/lib/preview-profile';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 
 export default function ProfileTab() {
@@ -18,7 +19,6 @@ export default function ProfileTab() {
   const [linkedTeachers, setLinkedTeachers] = useState<any[]>([]);
 
   useEffect(() => {
-    // Skip linked-teacher fetch in preview — show empty placeholder section.
     if (!realProfile || impersonating) {
       setLinkedTeachers([]);
       return;
@@ -38,20 +38,19 @@ export default function ProfileTab() {
   const trialDays = expires && profile.subscription_status === 'trial'
     ? Math.max(0, differenceInCalendarDays(expires, new Date())) : null;
 
-    const onSignOut = () => {
+  const onSignOut = () => {
     if (impersonating) {
-      Alert.alert(
+      showAlert(
         'Önizleme modundasın',
         'Buradan çıkış yapamazsın. Üstteki sarı bantta yer alan "Çık" tuşuna bastığında önizlemeden çıkacaksın.',
       );
       return;
     }
-    Alert.alert('Çıkış', 'Hesabından çıkmak istediğinden emin misin?', [
+    showAlert('Çıkış Yap', 'Hesabından çıkmak istediğinden emin misin?', [
       { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Çıkış',  style: 'destructive', onPress: signOut },
+      { text: 'Çıkış Yap', style: 'destructive', onPress: signOut },
     ]);
   };
-
 
   return (
     <Screen>
@@ -67,10 +66,7 @@ export default function ProfileTab() {
       </View>
 
       {/* Subscription */}
-      <Pressable
-        style={styles.card}
-        onPress={() => router.push('/paywall')}
-      >
+      <Pressable style={styles.card} onPress={() => router.push('/paywall')}>
         <View style={styles.cardHeaderRow}>
           <Text style={styles.cardTitle}>Abonelik</Text>
           <View style={[styles.tag, profile.subscription_status === 'trial' && styles.tagTrial]}>
@@ -105,7 +101,7 @@ export default function ProfileTab() {
       </View>
 
       <Pressable onPress={onSignOut} style={styles.signOut}>
-        <Ionicons name="log-out-outline" size={22} color={theme.colors.feedback.errorText} />
+        <Ionicons name="log-out-outline" size={20} color={theme.colors.feedback.errorText} />
         <Text style={styles.signOutText}>Çıkış Yap</Text>
       </Pressable>
     </Screen>
@@ -138,8 +134,16 @@ const styles = StyleSheet.create({
   teacherName: { ...theme.typography.body, color: theme.colors.text.primary },
   teacherMeta: { ...theme.typography.caption, color: theme.colors.text.muted },
   signOut: {
-    flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2],
-    padding: theme.spacing[3], marginTop: theme.spacing[4],
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing[2],
+    backgroundColor: theme.colors.feedback.errorSubtle,
+    borderWidth: 1,
+    borderColor: theme.colors.feedback.error + '60',
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing[4],
+    marginTop: theme.spacing[4],
   },
   signOutText: { ...theme.typography.bodyMedium, color: theme.colors.feedback.errorText },
 });

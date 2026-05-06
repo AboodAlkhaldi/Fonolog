@@ -15,35 +15,54 @@ interface Props {
   onChoose: (choice: string) => void;
 }
 
-/**
- * Pronunciation challenge.
- *  1. Show the word + emoji + speaker (so child can hear it first)
- *  2. Press-and-hold mic, say the word
- *  3. Server returns verdict (correct/close/wrong)
- *  4. We forward the correct/wrong result to onChoose so the session machine
- *     records it just like a multiple-choice answer.
- */
-export function PronunciationQuestion({ question, status, chosen, onChoose }: Props) {
+type VerdictLabel = 'correct' | 'close' | 'wrong';
+
+function getVerdictLabel(r: PronunciationResult): VerdictLabel {
+  if (r.verdict === 'correct') return 'correct';
+  if (r.verdict === 'close')   return 'close';
+  return 'wrong';
+}
+
+const VERDICT_CONFIG: Record<VerdictLabel, { text: string; bg: string; border: string; textColor: string; icon: string }> = {
+  correct: {
+    text:      'Harika! Doğru söyledin.',
+    bg:        theme.colors.feedback.successSubtle,
+    border:    theme.colors.feedback.success,
+    textColor: theme.colors.feedback.successText,
+    icon:      '✅',
+  },
+  close: {
+    text:      'Yakın! Biraz daha dene.',
+    bg:        theme.colors.feedback.warningSubtle,
+    border:    theme.colors.feedback.warning,
+    textColor: theme.colors.text.primary,
+    icon:      '🎯',
+  },
+  wrong: {
+    text:      'Tekrar dene!',
+    bg:        theme.colors.feedback.errorSubtle,
+    border:    theme.colors.feedback.error,
+    textColor: theme.colors.feedback.errorText,
+    icon:      '🔄',
+  },
+};
+
+export function PronunciationQuestion({ question, status, chosen: _chosen, onChoose }: Props) {
   const revealed = status === 'revealed';
   const audioUrl = (question.word as any).tts_url ?? (question.word as any).audio_url ?? null;
-  const [transcript, setTranscript] = useState<string | null>(null);
-  const [similarity, setSimilarity] = useState<number | null>(null);
+  const [verdictLabel, setVerdictLabel] = useState<VerdictLabel | null>(null);
 
   const handleResult = (r: PronunciationResult) => {
-    setTranscript(r.transcript);
-    setSimilarity(r.similarity);
-    // Map verdict to a chosen answer: correct or close → mark as correct
+    setVerdictLabel(getVerdictLabel(r));
     const choice = r.verdict === 'wrong' ? '__wrong__' : question.correct;
     onChoose(choice);
   };
 
   return (
     <View style={styles.container}>
-      {question.prompt ? (
-        <Text style={styles.prompt}>{question.prompt}</Text>
-      ) : (
-        <Text style={styles.prompt}>Bu kelimeyi söyle:</Text>
-      )}
+      <Text style={styles.prompt}>
+        {question.prompt ?? 'Bu kelimeyi söyle:'}
+      </Text>
 
       <View style={styles.card}>
         <Text style={styles.emoji}>{question.word.emoji}</Text>
@@ -51,15 +70,18 @@ export function PronunciationQuestion({ question, status, chosen, onChoose }: Pr
         <SpeakerButton audioUrl={audioUrl} size={56} style={{ marginTop: theme.spacing[3] }} />
       </View>
 
-      {revealed && transcript !== null ? (
-        <View style={styles.feedbackBox}>
-          <Text style={styles.feedbackLabel}>Duyduğum:</Text>
-          <Text style={styles.feedbackTranscript}>"{transcript}"</Text>
-          {similarity !== null ? (
-            <Text style={styles.feedbackScore}>
-              Benzerlik: {Math.round(similarity * 100)}%
-            </Text>
-          ) : null}
+      {revealed && verdictLabel !== null ? (
+        <View style={[
+          styles.verdictBox,
+          {
+            backgroundColor: VERDICT_CONFIG[verdictLabel].bg,
+            borderColor:     VERDICT_CONFIG[verdictLabel].border,
+          },
+        ]}>
+          <Text style={styles.verdictIcon}>{VERDICT_CONFIG[verdictLabel].icon}</Text>
+          <Text style={[styles.verdictText, { color: VERDICT_CONFIG[verdictLabel].textColor }]}>
+            {VERDICT_CONFIG[verdictLabel].text}
+          </Text>
         </View>
       ) : null}
 
@@ -106,23 +128,21 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
     marginTop: theme.spacing[2],
   },
-  feedbackBox: {
-    marginTop: theme.spacing[5],
-    padding: theme.spacing[4],
-    backgroundColor: theme.colors.feedback.infoSubtle,
-    borderRadius: theme.radius.lg,
-    alignItems: 'center',
-    minWidth: 220,
+  verdictBox: {
+    marginTop:    theme.spacing[5],
+    paddingVertical:   theme.spacing[4],
+    paddingHorizontal: theme.spacing[5],
+    borderRadius: theme.radius.xl,
+    borderWidth:  2,
+    alignItems:   'center',
+    minWidth:     220,
+    gap:          theme.spacing[2],
   },
-  feedbackLabel: { ...theme.typography.caption, color: theme.colors.text.muted },
-  feedbackTranscript: {
-    ...theme.typography.h3,
-    color: theme.colors.text.primary,
-    marginTop: theme.spacing[1],
+  verdictIcon: {
+    fontSize: 36,
   },
-  feedbackScore: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.text.secondary,
-    marginTop: theme.spacing[2],
+  verdictText: {
+    ...theme.typography.h4,
+    textAlign: 'center',
   },
 });

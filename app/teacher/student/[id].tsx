@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Alert, Pressable, FlatList } from 'react-native';
+import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Loading, Button, Badge } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 
 export default function TeacherStudentDetail() {
@@ -45,13 +46,13 @@ export default function TeacherStudentDetail() {
   useEffect(() => { load(); }, [id, impersonating]);
 
   const onUnlink = () => {
-    Alert.alert('Öğrenciyi sil', 'Bu öğrenciyi listenden çıkarmak istediğinden emin misin? (Öğrencinin hesabı silinmeyecek.)', [
+    showAlert('Öğrenciyi Sil', 'Bu öğrenciyi listenden çıkarmak istediğinden emin misin? (Öğrencinin hesabı silinmeyecek.)', [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Sil', style: 'destructive',
         onPress: async () => {
           const { error } = await supabase.rpc('unlink_student', { p_student_id: id });
-          if (error) { Alert.alert('Hata', error.message); return; }
+          if (error) { showAlert('Hata', error.message); return; }
           router.back();
         },
       },
@@ -59,9 +60,9 @@ export default function TeacherStudentDetail() {
   };
 
   const onSendNotification = () => {
-    if (templates.length === 0) { Alert.alert('Bilgi', 'Şablon yok.'); return; }
-    Alert.alert(
-      'Bildirim gönder',
+    if (templates.length === 0) { showAlert('Bilgi', 'Henüz bildirim şablonu yok.'); return; }
+    showAlert(
+      'Bildirim Gönder',
       'Bir şablon seç:',
       [
         ...templates.map((tpl) => ({
@@ -87,8 +88,8 @@ export default function TeacherStudentDetail() {
         body:    tpl.body,
       }),
     });
-    if (res.ok) Alert.alert('Gönderildi', 'Bildirim öğrenciye iletildi.');
-    else Alert.alert('Hata', await res.text());
+    if (res.ok) showAlert('Gönderildi', 'Bildirim öğrenciye iletildi.');
+    else showAlert('Hata', await res.text());
   };
 
   const onAssignHomework = () => {
@@ -105,20 +106,21 @@ export default function TeacherStudentDetail() {
       },
       body: JSON.stringify({ student_id: id }),
     });
-    if (!res.ok) { Alert.alert('Hata', await res.text()); return; }
+    if (!res.ok) { showAlert('Hata', await res.text()); return; }
     const { html } = await res.json();
-    // Use expo-print to render and share
     try {
-      const Print = await import('expo-print');
+      const RNHTMLtoPDF = (await import('react-native-html-to-pdf')).default;
       const Sharing = await import('expo-sharing');
-      const { uri } = await Print.printToFileAsync({ html });
+      const fileName = `rapor-${new Date().toISOString().split('T')[0]}`;
+      const file = await RNHTMLtoPDF.convert({ html, fileName, directory: 'Documents' });
+      if (!file.filePath) { showAlert('Hata', 'PDF oluşturulamadı.'); return; }
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri);
+        await Sharing.shareAsync(file.filePath);
       } else {
-        Alert.alert('Tamam', `PDF oluşturuldu: ${uri}`);
+        showAlert('Tamam', `PDF oluşturuldu: ${file.filePath}`);
       }
     } catch (e) {
-      Alert.alert('Hata', 'PDF oluşturulurken hata: ' + (e instanceof Error ? e.message : ''));
+      showAlert('Hata', 'PDF oluşturulurken hata: ' + (e instanceof Error ? e.message : String(e)));
     }
   };
 

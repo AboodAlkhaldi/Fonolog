@@ -43,6 +43,7 @@ import { useAuth, type AuthStatus } from '@/store/auth';
 import { initAudio } from '@/audio/audio.service';
 import { initPurchases } from '@/lib/purchases';
 import { registerForPushNotifications } from '@/lib/notifications';
+import { AlertModal } from '@/components/common/AlertModal';
 import { theme } from '@/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -76,18 +77,20 @@ function useProtectedRoute(status: AuthStatus, role: string | null, impersonatin
         return;
 
       case 'authenticated':
-        // Role-based routing
         if (role === 'admin' && !impersonating) {
+          // Pure admin mode — keep inside admin
           if (root !== 'admin' && root !== 'paywall') router.replace('/admin');
         } else if (role === 'teacher' && !impersonating) {
+          // Pure teacher mode
           if (root !== 'teacher' && root !== 'paywall') router.replace('/teacher');
+        } else if (impersonating === 'teacher') {
+          // Admin previewing teacher view — allow admin root briefly during transition
+          const validRoots = ['teacher', 'admin', 'paywall'];
+          if (!validRoots.includes(root ?? '')) router.replace('/teacher');
         } else {
           // Student OR admin/teacher impersonating student
-          const validRoots = ['(tabs)', 'session', 'learn', 'paywall'];
-          if (impersonating === 'teacher') validRoots.push('teacher');
-          if (!validRoots.includes(root ?? '')) {
-            router.replace('/(tabs)');
-          }
+          const validRoots = ['(tabs)', 'session', 'learn', 'paywall', 'admin'];
+          if (!validRoots.includes(root ?? '')) router.replace('/(tabs)');
         }
         return;
 
@@ -135,6 +138,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
+          <AlertModal />
           <StatusBar style="dark" backgroundColor={theme.colors.background.primary} />
           <Stack
             screenOptions={{

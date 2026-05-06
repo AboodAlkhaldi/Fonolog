@@ -1,12 +1,14 @@
 import React, { useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Button, Loading, ErrorBanner } from '@/components';
+import { showAlert } from '@/store/alert';
 import { MultipleChoiceQuestion } from '@/components/session/MultipleChoiceQuestion';
 import { BuilderQuestion }        from '@/components/session/BuilderQuestion';
 import { PronunciationQuestion }  from '@/components/session/PronunciationQuestion';
+import { AudioPairQuestion }      from '@/components/session/AudioPairQuestion';
 import { QuestionPrompt }         from '@/components/session/QuestionPrompt';
 import { useSession, sessionProgress } from '@/store/session';
 import { getModule } from '@/domain';
@@ -63,7 +65,7 @@ export default function SessionScreen() {
   const screenType = moduleDef?.screenType;
 
   const handleQuit = () => {
-    Alert.alert(
+    showAlert(
       t('session.quit'),
       t('session.quitConfirm'),
       [
@@ -118,6 +120,13 @@ export default function SessionScreen() {
       <View style={styles.body}>
         {screenType === 'builder' ? (
           <BuilderQuestion
+            question={question}
+            status={qStatus}
+            chosen={lastChosen}
+            onChoose={answer}
+          />
+        ) : screenType === 'audio-pair' ? (
+          <AudioPairQuestion
             question={question}
             status={qStatus}
             chosen={lastChosen}

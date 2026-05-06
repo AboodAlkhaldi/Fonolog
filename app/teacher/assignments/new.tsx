@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, FlatList, Alert } from 'react-native';
+import { View, Text, Pressable, StyleSheet, FlatList } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Screen, Button, Input, Loading } from '@/components';
+import { Screen, Button, Input } from '@/components';
+import { showAlert } from '@/store/alert';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/auth';
 import { contentRepository, listModules } from '@/domain';
@@ -56,16 +57,10 @@ export default function NewAssignment() {
   const submit = async () => {
     if (!teacher) return;
     if (!studentId || pickedWords.size === 0 || pickedModules.size === 0 || !title) {
-      Alert.alert('Eksik', 'Tüm adımları tamamla.');
+      showAlert('Eksik', 'Tüm adımları tamamla.');
       return;
     }
     setSubmitting(true);
-
-    // Ensure teacher_students link exists (admin can assign to anyone)
-    await supabase.from('teacher_students').upsert(
-      { teacher_id: teacher.id, student_id: studentId },
-      { onConflict: 'teacher_id,student_id', ignoreDuplicates: true },
-    );
 
     const { error } = await supabase.from('assignments').insert({
       teacher_id: teacher.id,
@@ -77,12 +72,12 @@ export default function NewAssignment() {
     });
 
     setSubmitting(false);
-    if (error) { Alert.alert('Hata', error.message); return; }
+    if (error) { showAlert('Hata', error.message); return; }
     router.back();
   };
 
   return (
-    <Screen>
+    <Screen scroll={false}>
       <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
         <Ionicons name="chevron-back" size={28} color={theme.colors.text.primary} />
       </Pressable>

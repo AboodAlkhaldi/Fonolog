@@ -26,7 +26,8 @@ interface CharRow {
 type Tab = 'base' | 'extras';
 
 export default function CharacterTab() {
-  const profile = useAuth((s) => s.profile);
+  const profile       = useAuth((s) => s.profile);
+  const impersonating = useAuth((s) => s.impersonating);
   const [tab,        setTab]        = useState<Tab>('base');
   const [bases,      setBases]      = useState<BaseChar[]>([]);
   const [extras,     setExtras]     = useState<Extra[]>([]);
@@ -38,6 +39,21 @@ export default function CharacterTab() {
 
   const load = useCallback(async () => {
     if (!profile) return;
+
+    // In preview mode the real user is an admin — skip all DB writes to avoid RLS errors.
+    if (impersonating) {
+      setBases([]);
+      setExtras([]);
+      setCats([]);
+      setCharacter({
+        total_xp: 0, level: 1, current_streak: 0, longest_streak: 0,
+        base_character_id: null, equipped_hat: null, equipped_shirt: null,
+        equipped_shoes: null, equipped_acc: null, equipped_bg: null,
+      });
+      setLoading(false);
+      return;
+    }
+
     setError(null);
     try {
       const [b, x, c, ch] = await Promise.all([
@@ -82,7 +98,7 @@ export default function CharacterTab() {
       setError(e instanceof Error ? e.message : 'Karakter yüklenemedi.');
       setLoading(false);
     }
-  }, [profile?.id]);
+  }, [profile?.id, impersonating]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 

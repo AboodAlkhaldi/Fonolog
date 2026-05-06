@@ -1,33 +1,32 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Screen, Button } from '@/components';
+import { Screen } from '@/components';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 
 export default function AdminSettings() {
-  const profile = useAuth((s) => s.profile);
-  const signOut = useAuth((s) => s.signOut);
+  const profile       = useAuth((s) => s.profile);
+  const signOut       = useAuth((s) => s.signOut);
   const impersonating = useAuth((s) => s.impersonating);
-
 
   if (!profile) return null;
 
   const onSignOut = () => {
     if (impersonating) {
-      Alert.alert(
+      showAlert(
         'Önizleme modundasın',
         'Buradan çıkış yapamazsın. Üstteki sarı bantta yer alan "Çık" tuşuna bas.',
       );
       return;
     }
-    Alert.alert('Çıkış', 'Hesabından çıkmak istediğinden emin misin?', [
+    showAlert('Çıkış Yap', 'Hesabından çıkmak istediğinden emin misin?', [
       { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Çıkış',  style: 'destructive', onPress: signOut },
+      { text: 'Çıkış Yap', style: 'destructive', onPress: signOut },
     ]);
   };
-
 
   return (
     <Screen>
@@ -43,7 +42,7 @@ export default function AdminSettings() {
       </View>
 
       <Pressable onPress={onSignOut} style={styles.signOut}>
-        <Ionicons name="log-out-outline" size={22} color={theme.colors.feedback.errorText} />
+        <Ionicons name="log-out-outline" size={20} color={theme.colors.feedback.errorText} />
         <Text style={styles.signOutText}>Çıkış Yap</Text>
       </Pressable>
     </Screen>
@@ -60,8 +59,16 @@ const styles = StyleSheet.create({
   label: { ...theme.typography.caption, color: theme.colors.text.muted, marginTop: theme.spacing[2] },
   value: { ...theme.typography.body, color: theme.colors.text.primary },
   signOut: {
-    flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2],
-    padding: theme.spacing[3], marginTop: theme.spacing[4],
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing[2],
+    backgroundColor: theme.colors.feedback.errorSubtle,
+    borderWidth: 1,
+    borderColor: theme.colors.feedback.error + '60',
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing[4],
+    marginTop: theme.spacing[4],
   },
   signOutText: { ...theme.typography.bodyMedium, color: theme.colors.feedback.errorText },
 });

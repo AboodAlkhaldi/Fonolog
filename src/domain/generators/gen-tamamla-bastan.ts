@@ -25,7 +25,7 @@ export function genTamamlaBastan(words: Word[]): Question[] {
       word,
       options: shuffle([head, ...distractors]),
       correct: head,
-      prompt:  `"___${ending}" — eksik parçayı seç!`,
+      prompt:  `___${ending}`,
     }
   }).filter((q): q is NonNullable<typeof q> => q !== null) as Question[]
 }

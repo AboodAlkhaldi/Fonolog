@@ -1,19 +1,20 @@
 import React from 'react';
-import { View, Text, StyleSheet, Alert, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { differenceInCalendarDays } from 'date-fns';
 
 import { Screen, Button } from '@/components';
 import { useAuth } from '@/store/auth';
 import { withPreviewPlaceholders } from '@/lib/preview-profile';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
-import { differenceInCalendarDays } from 'date-fns';
 
 export default function TeacherSettings() {
   const realProfile   = useAuth((s) => s.profile);
   const impersonating = useAuth((s) => s.impersonating);
   const profile       = withPreviewPlaceholders(realProfile, impersonating);
-  const signOut = useAuth((s) => s.signOut);
+  const signOut       = useAuth((s) => s.signOut);
 
   if (!profile) return null;
 
@@ -24,15 +25,15 @@ export default function TeacherSettings() {
 
   const onSignOut = () => {
     if (impersonating) {
-      Alert.alert(
+      showAlert(
         'Önizleme modundasın',
         'Buradan çıkış yapamazsın. Üstteki sarı bantta yer alan "Çık" tuşuna bas.',
       );
       return;
     }
-    Alert.alert('Çıkış', 'Hesabından çıkmak istediğinden emin misin?', [
+    showAlert('Çıkış Yap', 'Hesabından çıkmak istediğinden emin misin?', [
       { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Çıkış',  style: 'destructive', onPress: signOut },
+      { text: 'Çıkış Yap', style: 'destructive', onPress: signOut },
     ]);
   };
 
@@ -59,9 +60,7 @@ export default function TeacherSettings() {
           <Text style={styles.tag}>{profile.subscription_status}</Text>
         </View>
         {trialDays !== null ? (
-          <Text style={styles.cardDesc}>
-            Deneme süreci: {trialDays} gün kaldı
-          </Text>
+          <Text style={styles.cardDesc}>Deneme süreci: {trialDays} gün kaldı</Text>
         ) : null}
         <Button
           label="Aboneliği Yükselt"
@@ -73,9 +72,8 @@ export default function TeacherSettings() {
         />
       </View>
 
-      {/* Sign out */}
       <Pressable onPress={onSignOut} style={styles.signOut}>
-        <Ionicons name="log-out-outline" size={22} color={theme.colors.feedback.errorText} />
+        <Ionicons name="log-out-outline" size={20} color={theme.colors.feedback.errorText} />
         <Text style={styles.signOutText}>Çıkış Yap</Text>
       </Pressable>
     </Screen>
@@ -101,8 +99,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 4, borderRadius: theme.radius.sm,
   },
   signOut: {
-    flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2],
-    padding: theme.spacing[3], marginTop: theme.spacing[4], alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing[2],
+    backgroundColor: theme.colors.feedback.errorSubtle,
+    borderWidth: 1,
+    borderColor: theme.colors.feedback.error + '60',
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing[4],
+    marginTop: theme.spacing[4],
   },
   signOutText: { ...theme.typography.bodyMedium, color: theme.colors.feedback.errorText },
 });

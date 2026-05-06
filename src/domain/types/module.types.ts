@@ -1,6 +1,6 @@
 import type { Word } from './word.types'
 
-export type ScreenType = 'quiz' | 'builder' | 'phoneme' | 'memory' | 'visual' | 'explore' | 'pronunciation'
+export type ScreenType = 'quiz' | 'builder' | 'phoneme' | 'memory' | 'visual' | 'explore' | 'pronunciation' | 'audio-pair'
 
 export type SessionMode = 'free' | 'learn' | 'revision' | 'homework' | 'test'
 
@@ -10,6 +10,7 @@ export interface Question {
   options?: string[]     // for quiz: 4 answer choices
   correct:  string       // the correct answer string
   prompt?:  string       // instruction text override
+  extra?:   Record<string, unknown>  // module-specific payload (e.g. wordA/wordB for audio-pair)
 }
 
 export interface ModuleDefinition {
