@@ -9,8 +9,8 @@
  */
 
 // ─── Enums ───────────────────────────────────────────────
-export type UserRole           = 'student' | 'admin';
-export type SubscriptionStatus = 'free' | 'trial' | 'student' | 'expert';
+export type UserRole           = 'student' | 'teacher' | 'admin';
+export type SubscriptionStatus = 'free' | 'trial' | 'active' | 'student' | 'expert';
 export type AssignmentStatus   = 'assigned' | 'in_progress' | 'completed' | 'skipped' | 'cancelled';
 export type MilestoneStatus    = 'pending' | 'in_progress' | 'completed' | 'skipped';
 export type ItemSlot           = 'hat' | 'shirt' | 'shoes' | 'acc' | 'bg';
@@ -42,6 +42,11 @@ export interface ProfileRow {
   child_age:             number | null;
   child_avatar_emoji:    string | null;
   device_push_token:     string | null;
+  role_locked_at:        string | null;
+  school_name:           string | null;
+  planned_students:      number | null;
+  teacher_age:           number | null;
+  planned_plan:          'monthly' | 'yearly' | null;
   created_at:            string;
   updated_at:            string;
 }
