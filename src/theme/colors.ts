@@ -119,6 +119,7 @@ export const colors = {
 
     warning:        palette.yellow[600],
     warningSubtle:  palette.yellow[200],
+    warningText:    palette.yellow[700],
 
     error:          palette.red[500],
     errorSubtle:    palette.red[100],

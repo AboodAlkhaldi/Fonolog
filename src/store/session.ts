@@ -1,23 +1,19 @@
 /**
- * Session machine — orchestrates one playthrough of one module.
+ * Session machine — applies freemium word cap.
  *
- * Flow:
- *   idle → loading → ready → (revealed → ready)* → finished
- *
- * Lifecycle:
- *   1. start(moduleId, opts)    loads questions, captures assignmentId
- *   2. answer(choice)           records, sets lastVerdict, status='revealed'
- *                               ('__skip__' or '__wrong__' from PronunciationQuestion → treated as wrong)
- *   3. next()                   advances; sets status='finished' when done
- *   4. finish()                 posts session_log + award_xp + update_streak + marks assignment complete
+ * On start():
+ *   1. Get user's tier
+ *   2. Generate session via domain
+ *   3. If free tier: cap to FREE_WORDS_PER_CATEGORY × 2 questions max
  */
 import { create } from 'zustand';
 import { generateSession, type SessionOptions, type Question } from '@/domain';
 import { supabase } from '@/lib/supabase';
+import { getAccessTier, canPlayModule, maxWordsForTier } from '@/lib/access-tier';
 import { useAuth } from './auth';
 
 export type Verdict   = 'correct' | 'wrong' | null;
-export type SessStat  = 'idle' | 'loading' | 'ready' | 'revealed' | 'finished' | 'error';
+export type SessStat  = 'idle' | 'loading' | 'ready' | 'revealed' | 'finished' | 'error' | 'locked';
 
 interface AnswerLog {
   questionId:   string;
@@ -91,10 +87,27 @@ export const useSession = create<SessionState>((set, get) => ({
       xpEarned: 0,
       extra: { assignmentId: opts.assignmentId },
     });
+
     try {
-      const profile  = useAuth.getState().profile;
-      const maxQ     = opts.maxQuestions ?? SESSION_LENGTH_BY_AGE(profile?.child_age ?? null);
-      const qs       = await generateSession(moduleId, { ...opts, maxQuestions: maxQ });
+      const profile = useAuth.getState().profile;
+      const tier    = getAccessTier(profile);
+
+      if (!canPlayModule(tier, moduleId)) {
+        set({ status: 'locked', errorMessage: 'Bu modül abonelik gerektirir.' });
+        return;
+      }
+
+      const ageBased  = SESSION_LENGTH_BY_AGE(profile?.child_age ?? null);
+      const wordCap   = maxWordsForTier(tier);
+      // New random-from-all-words flow (no category, no specific word list)
+      // serves a fixed 20-question session. Category- or assignment-scoped
+      // sessions keep the original age-based length so existing flows (admin
+      // category drill-in, teacher-assigned ödev) are untouched.
+      const isRandomFromAll = !opts.categoryId && !(opts.wordIds && opts.wordIds.length > 0);
+      const baseDefault     = isRandomFromAll ? 20 : ageBased;
+      const maxQ      = opts.maxQuestions ?? Math.min(baseDefault, wordCap ? wordCap * 2 : baseDefault);
+
+      const qs = await generateSession(moduleId, { ...opts, maxQuestions: maxQ });
       if (qs.length === 0) {
         set({ status: 'error', errorMessage: 'Bu modül için yeterli kelime yok.' });
         return;
@@ -116,7 +129,6 @@ export const useSession = create<SessionState>((set, get) => ({
     if (status !== 'ready') return;
     const q = questions[index];
     if (!q) return;
-    // PronunciationQuestion sends '__skip__' or '__wrong__' on failure — both count as wrong
     const correct: boolean = chosen === q.correct;
     const verdict: Verdict = correct ? 'correct' : 'wrong';
     const log: AnswerLog = {
@@ -168,7 +180,6 @@ export const useSession = create<SessionState>((set, get) => ({
       .map((a) => a.wordId)
       .filter((x): x is string => Boolean(x));
 
-    // 1. Insert session_log (include assignment_id if present)
     const insertPayload: any = {
       student_id:        profile.id,
       module_id:         moduleId,
@@ -188,7 +199,6 @@ export const useSession = create<SessionState>((set, get) => ({
 
     if (logErr) console.warn('[session] session_log insert failed', logErr.message);
 
-    // 2. Award XP via Stage 1 RPC
     const sessionId = logRow?.id ?? null;
     const { error: xpErr } = await supabase.rpc('award_xp', {
       p_amount:     xp,
@@ -197,16 +207,14 @@ export const useSession = create<SessionState>((set, get) => ({
     });
     if (xpErr) console.warn('[session] award_xp failed', xpErr.message);
 
-    // 3. Update streak
     const { error: streakErr } = await supabase.rpc('update_streak');
     if (streakErr) console.warn('[session] update_streak failed', streakErr.message);
 
-    // 4. Mark assignment complete if this session was linked to one
     if (extra.assignmentId) {
       await supabase.from('assignments').update({
-        status:       'completed',
+        status: 'completed',
         completed_at: new Date().toISOString(),
-        session_id:   sessionId,
+        session_id: sessionId,
       }).eq('id', extra.assignmentId);
     }
 
@@ -214,25 +222,11 @@ export const useSession = create<SessionState>((set, get) => ({
   },
 
   reset: () => set({
-    status: 'idle',
-    moduleId: null,
-    questions: [],
-    index: 0,
-    answers: [],
-    lastVerdict: null,
-    lastChosen: null,
-    startedAt: 0,
-    questionShownAt: 0,
-    errorMessage: null,
-    xpEarned: 0,
-    extra: {},
+    status: 'idle', moduleId: null, questions: [], index: 0, answers: [],
+    lastVerdict: null, lastChosen: null, startedAt: 0, questionShownAt: 0,
+    errorMessage: null, xpEarned: 0, extra: {},
   }),
 }));
 
-/**
- * Selector for progress (0–1).
- */
-export const sessionProgress = (state: SessionState): number => {
-  if (state.questions.length === 0) return 0;
-  return (state.index + 1) / state.questions.length;
-};
+export const sessionProgress = (s: SessionState): number =>
+  s.questions.length === 0 ? 0 : (s.index + 1) / s.questions.length;
