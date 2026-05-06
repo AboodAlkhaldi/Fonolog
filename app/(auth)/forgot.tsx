@@ -1,34 +1,38 @@
-import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
+import React from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useMutation } from '@tanstack/react-query';
 
 import { Screen, Button, Input, ErrorBanner } from '@/components';
+import { useAlert } from '@/store/alert';
 import { supabase } from '@/lib/supabase';
+import { AppError } from '@/lib/error';
 import { useForm }  from '@/lib/useForm';
 import { forgotSchema, type ForgotValues } from '@/lib/schemas';
-import { theme }    from '@/theme';
-import { t }        from '@/i18n';
+import { theme } from '@/theme';
+import { t }     from '@/i18n';
 
 export default function ForgotScreen() {
-  const [serverError, setServerError] = useState('');
-  const [sent, setSent] = useState(false);
+  const alert = useAlert();
 
   const form = useForm<ForgotValues>(forgotSchema, { email: '' });
 
-  const handleSubmit = async () => {
-    setServerError('');
-    await form.submit(async (values) => {
+  const mutation = useMutation({
+    mutationFn: async (values: ForgotValues) => {
       const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-        // The mobile deep-link the user lands on from the email
         redirectTo: 'okuma://reset-password',
       });
-      if (error) {
-        setServerError(error.message);
-        return;
-      }
-      setSent(true);
-    });
+      if (error) throw new AppError(error.message);
+    },
+    onError: alert.setAlert,
+  });
+
+  const handleSubmit = () => {
+    alert.clearAlert();
+    const validated = form.validate();
+    if (!validated) return;
+    mutation.mutate(validated);
   };
 
   return (
@@ -48,9 +52,9 @@ export default function ForgotScreen() {
         <Text style={styles.subtitle}>{t('auth.forgot.subtitle')}</Text>
       </View>
 
-      <ErrorBanner message={serverError} />
+      <ErrorBanner message={alert.error?.message ?? ''} />
 
-      {sent ? (
+      {mutation.isSuccess ? (
         <View style={styles.successCard}>
           <Text style={styles.successText}>{t('auth.forgot.sent')}</Text>
         </View>
@@ -71,7 +75,7 @@ export default function ForgotScreen() {
             variant="cta"
             size="lg"
             fullWidth
-            loading={form.submitting}
+            loading={mutation.isPending}
             onPress={handleSubmit}
             style={styles.submit}
           />

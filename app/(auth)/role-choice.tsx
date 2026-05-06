@@ -1,17 +1,25 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useMutation } from '@tanstack/react-query';
 
-import { Screen, Button } from '@/components';
-import { useAuth } from '@/store/auth';
+import { Screen, Button, ErrorBanner } from '@/components';
+import { useAuth }  from '@/store/auth';
+import { useAlert } from '@/store/alert';
 import { theme } from '@/theme';
 
 export default function RoleChoiceScreen() {
   const chooseRole = useAuth((s) => s.chooseRole);
+  const alert      = useAlert();
   const [picked, setPicked] = useState<'student' | 'teacher' | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
-  const onContinue = async () => {
+  const mutation = useMutation({
+    mutationFn: (role: 'student' | 'teacher') => chooseRole(role),
+    onError: alert.setAlert,
+    // Navigation handled by useProtectedRoute on status change.
+  });
+
+  const onContinue = () => {
     if (!picked) return;
     Alert.alert(
       'Dikkat',
@@ -20,15 +28,7 @@ export default function RoleChoiceScreen() {
         : 'Öğretmen olarak devam ediyorsun. Bu seçim DAİMİDİR ve sonra değiştirilemez.',
       [
         { text: 'Vazgeç', style: 'cancel' },
-        {
-          text:    'Onaylıyorum',
-          onPress: async () => {
-            setSubmitting(true);
-            const r = await chooseRole(picked);
-            if (!r.ok) Alert.alert('Hata', r.error ?? 'Rol kaydedilemedi.');
-            setSubmitting(false);
-          },
-        },
+        { text: 'Onaylıyorum', onPress: () => mutation.mutate(picked) },
       ],
     );
   };
@@ -75,13 +75,15 @@ export default function RoleChoiceScreen() {
         </Text>
       </View>
 
+      <ErrorBanner message={alert.error?.message ?? ''} />
+
       <Button
         label="Devam Et"
         variant="cta"
         size="lg"
         fullWidth
         disabled={!picked}
-        loading={submitting}
+        loading={mutation.isPending}
         onPress={onContinue}
         style={{ marginTop: theme.spacing[4] }}
       />

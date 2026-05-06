@@ -1,33 +1,39 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
+import { useMutation } from '@tanstack/react-query';
 
-import { Screen, Button, Input } from '@/components';
-import { useAuth } from '@/store/auth';
+import { Screen, Button, Input, ErrorBanner } from '@/components';
+import { useAuth }  from '@/store/auth';
+import { useAlert } from '@/store/alert';
 import { theme } from '@/theme';
 
 export default function TeacherSignup() {
   const saveTeacherInfo = useAuth((s) => s.saveTeacherInfo);
+  const alert           = useAlert();
 
   const [schoolName,      setSchoolName]      = useState('');
   const [plannedStudents, setPlannedStudents] = useState('');
   const [teacherAge,      setTeacherAge]      = useState('');
   const [plannedPlan,     setPlannedPlan]     = useState<'monthly' | 'yearly' | null>(null);
-  const [submitting,      setSubmitting]      = useState(false);
 
-  const onSubmit = async () => {
+  const mutation = useMutation({
+    mutationFn: () => saveTeacherInfo({
+      schoolName,
+      plannedStudents: parseInt(plannedStudents, 10),
+      teacherAge:      parseInt(teacherAge, 10),
+      plannedPlan:     plannedPlan!,
+    }),
+    onError: alert.setAlert,
+    // Navigation handled by useProtectedRoute on status change.
+  });
+
+  const onSubmit = () => {
     if (!schoolName || !plannedStudents || !teacherAge || !plannedPlan) {
       Alert.alert('Eksik', 'Tüm alanları doldur.');
       return;
     }
-    setSubmitting(true);
-    const r = await saveTeacherInfo({
-      schoolName,
-      plannedStudents: parseInt(plannedStudents, 10),
-      teacherAge:      parseInt(teacherAge, 10),
-      plannedPlan,
-    });
-    setSubmitting(false);
-    if (!r.ok) Alert.alert('Hata', r.error ?? 'Kayıt başarısız.');
+    alert.clearAlert();
+    mutation.mutate();
   };
 
   return (
@@ -80,12 +86,14 @@ export default function TeacherSignup() {
           </Pressable>
         </View>
 
+        <ErrorBanner message={alert.error?.message ?? ''} />
+
         <Button
           label="Kaydet ve Devam Et"
           variant="cta"
           size="lg"
           fullWidth
-          loading={submitting}
+          loading={mutation.isPending}
           onPress={onSubmit}
         />
       </ScrollView>

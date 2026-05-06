@@ -25,14 +25,14 @@ export default function OnboardingWelcomeScreen() {
     }
     setSubmitting(true);
     setError('');
-    const res = await saveChild(age, avatar);
-    if (!res.ok) {
-      setError(res.error);
+    try {
+      await saveChild(age, avatar);
+      reset();
+      // useProtectedRoute redirects to (tabs).
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
       setSubmitting(false);
-      return;
     }
-    reset();
-    // useProtectedRoute redirects to (tabs).
   };
 
   const childName = profile?.full_name?.split(' ')[0] ?? '';

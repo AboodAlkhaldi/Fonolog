@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
+import { useMutation } from '@tanstack/react-query';
 
-import { Screen, Button } from '@/components';
-import { useAuth } from '@/store/auth';
-import { theme }   from '@/theme';
-import { t }       from '@/i18n';
+import { Screen, Button, ErrorBanner } from '@/components';
+import { useAuth }  from '@/store/auth';
+import { useAlert } from '@/store/alert';
+import { theme } from '@/theme';
+import { t }     from '@/i18n';
 
 const RESEND_COOLDOWN_S = 60;
 
@@ -14,13 +15,12 @@ export default function VerifyEmailScreen() {
   const user    = useAuth((s) => s.user);
   const resend  = useAuth((s) => s.resendVerification);
   const signOut = useAuth((s) => s.signOut);
+  const alert   = useAlert();
 
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendNotice,   setResendNotice]   = useState('');
-  const [checking,       setChecking]       = useState(false);
   const cooldownTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Cooldown countdown
   useEffect(() => {
     if (resendCooldown <= 0) return;
     cooldownTimer.current = setInterval(() => {
@@ -29,22 +29,28 @@ export default function VerifyEmailScreen() {
     return () => {
       if (cooldownTimer.current) clearInterval(cooldownTimer.current);
     };
-  }, [resendCooldown > 0]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [resendCooldown > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleResend = async () => {
-    if (!user?.email || resendCooldown > 0) return;
-    const res = await resend();
-    if (res.ok) {
+  const resendMutation = useMutation({
+    mutationFn: resend,
+    onSuccess: () => {
       setResendNotice(t('auth.verifyEmail.resendSent'));
       setResendCooldown(RESEND_COOLDOWN_S);
       setTimeout(() => setResendNotice(''), 4000);
-    }
-  };
+    },
+    onError: alert.setAlert,
+  });
 
-  const handleManualCheck = async () => {
-    setChecking(true);
-    await signOut();
-    router.replace('/(auth)/login');
+  const checkMutation = useMutation({
+    mutationFn: signOut,
+    onSuccess: () => router.replace('/(auth)/login'),
+    onError: alert.setAlert,
+  });
+
+  const handleResend = () => {
+    if (!user?.email || resendCooldown > 0) return;
+    alert.clearAlert();
+    resendMutation.mutate();
   };
 
   return (
@@ -59,13 +65,15 @@ export default function VerifyEmailScreen() {
       </View>
 
       <View style={styles.actions}>
+        <ErrorBanner message={alert.error?.message ?? ''} />
+
         <Button
           label={t('auth.verifyEmail.iVerified')}
           variant="cta"
           size="lg"
           fullWidth
-          loading={checking}
-          onPress={handleManualCheck}
+          loading={checkMutation.isPending}
+          onPress={() => checkMutation.mutate()}
         />
 
         <View style={styles.resendRow}>

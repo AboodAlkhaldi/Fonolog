@@ -1,18 +1,20 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useMutation } from '@tanstack/react-query';
 
 import { Screen, Button, Input, ErrorBanner } from '@/components';
-import { useAuth }   from '@/store/auth';
-import { useForm }   from '@/lib/useForm';
+import { useAuth }  from '@/store/auth';
+import { useAlert } from '@/store/alert';
+import { useForm }  from '@/lib/useForm';
 import { registerSchema, type RegisterValues } from '@/lib/schemas';
-import { theme }     from '@/theme';
-import { t }         from '@/i18n';
+import { theme } from '@/theme';
+import { t }     from '@/i18n';
 
 export default function RegisterScreen() {
   const signUp = useAuth((s) => s.signUp);
-  const [serverError, setServerError] = useState('');
+  const alert  = useAlert();
 
   const form = useForm<RegisterValues>(registerSchema, {
     fullName: '',
@@ -21,19 +23,17 @@ export default function RegisterScreen() {
     passwordConfirm: '',
   });
 
-  const handleSubmit = async () => {
-    setServerError('');
-    await form.submit(async (values) => {
-      const res = await signUp(values.email, values.password, values.fullName);
-      if (!res.ok) {
-        // res.error is either an i18n key (e.g. "auth.register.errors.emailTaken") or raw text
-        const localized = res.error.startsWith('auth.') ? t(res.error) : res.error;
-        setServerError(localized);
-        return;
-      }
-      // Auth state changes; useProtectedRoute will move us to verify-email.
-      router.replace('/(auth)/verify-email');
-    });
+  const mutation = useMutation({
+    mutationFn: (values: RegisterValues) => signUp(values.email, values.password, values.fullName),
+    onSuccess: () => router.replace('/(auth)/verify-email'),
+    onError: alert.setAlert,
+  });
+
+  const handleSubmit = () => {
+    alert.clearAlert();
+    const validated = form.validate();
+    if (!validated) return;
+    mutation.mutate(validated);
   };
 
   return (
@@ -53,7 +53,7 @@ export default function RegisterScreen() {
         <Text style={styles.subtitle}>{t('auth.register.subtitle')}</Text>
       </View>
 
-      <ErrorBanner message={serverError} />
+      <ErrorBanner message={alert.error?.message ?? ''} />
 
       <Input
         label={t('auth.register.parentName')}
@@ -109,7 +109,7 @@ export default function RegisterScreen() {
         variant="cta"
         size="lg"
         fullWidth
-        loading={form.submitting}
+        loading={mutation.isPending}
         onPress={handleSubmit}
         style={styles.submit}
       />
