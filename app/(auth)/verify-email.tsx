@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 
@@ -10,10 +11,9 @@ import { t }       from '@/i18n';
 const RESEND_COOLDOWN_S = 60;
 
 export default function VerifyEmailScreen() {
-  const user        = useAuth((s) => s.user);
-  const refresh     = useAuth((s) => s.refreshProfile);
-  const resend      = useAuth((s) => s.resendVerification);
-  const signOut     = useAuth((s) => s.signOut);
+  const user    = useAuth((s) => s.user);
+  const resend  = useAuth((s) => s.resendVerification);
+  const signOut = useAuth((s) => s.signOut);
 
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendNotice,   setResendNotice]   = useState('');
@@ -31,17 +31,9 @@ export default function VerifyEmailScreen() {
     };
   }, [resendCooldown > 0]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll every 5s for the user's email_confirmed_at to show up.
-  useEffect(() => {
-    const id = setInterval(() => {
-      refresh();
-    }, 5000);
-    return () => clearInterval(id);
-  }, [refresh]);
-
   const handleResend = async () => {
     if (!user?.email || resendCooldown > 0) return;
-    const res = await resend(user.email);
+    const res = await resend();
     if (res.ok) {
       setResendNotice(t('auth.verifyEmail.resendSent'));
       setResendCooldown(RESEND_COOLDOWN_S);
@@ -51,11 +43,8 @@ export default function VerifyEmailScreen() {
 
   const handleManualCheck = async () => {
     setChecking(true);
-    try {
-      await refresh();
-    } finally {
-      setChecking(false);
-    }
+    await signOut();
+    router.replace('/(auth)/login');
   };
 
   return (

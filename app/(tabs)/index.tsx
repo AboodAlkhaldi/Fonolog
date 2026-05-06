@@ -1,95 +1,111 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { differenceInCalendarDays } from 'date-fns';
 
 import { Screen, Button, Badge } from '@/components';
+import { CharacterRenderer } from '@/components/character/CharacterRenderer';
 import { useAuth } from '@/store/auth';
 import { supabase } from '@/lib/supabase';
+import { getAccessTier, trialDaysRemaining } from '@/lib/access-tier';
+import { withPreviewPlaceholders } from '@/lib/preview-profile';
 import { theme } from '@/theme';
-import { t }     from '@/i18n';
+import { t } from '@/i18n';
 
-interface CharacterStats {
+interface CharStats {
   total_xp: number;
-  level:    number;
+  level: number;
+  current_streak: number;
+  base_character_id: string | null;
 }
 
 export default function HomeTab() {
-  const profile = useAuth((s) => s.profile);
-  const [stats, setStats] = useState<CharacterStats | null>(null);
+  const realProfile   = useAuth((s) => s.profile);
+  const impersonating = useAuth((s) => s.impersonating);
+  const profile       = withPreviewPlaceholders(realProfile, impersonating);
+  const [stats, setStats] = useState<CharStats | null>(null);
+  const [baseChar, setBaseChar] = useState<any>(null);
 
   useEffect(() => {
-    if (!profile) return;
+    // Skip live character fetch when impersonating — the preview uses placeholder stats.
+    if (!realProfile || impersonating) return;
     let alive = true;
     (async () => {
       const { data } = await supabase
         .from('student_character')
-        .select('total_xp, level')
-        .eq('student_id', profile.id)
+        .select('total_xp, level, current_streak, base_character_id')
+        .eq('student_id', realProfile.id)
         .maybeSingle();
-      if (alive && data) setStats({ total_xp: data.total_xp, level: data.level });
+      if (alive && data) {
+        setStats(data as any);
+        if (data.base_character_id) {
+          const { data: bc } = await supabase
+            .from('characters_base').select('*').eq('id', data.base_character_id).maybeSingle();
+          setBaseChar(bc);
+        }
+      }
     })();
     return () => { alive = false; };
-  }, [profile?.id]);
+  }, [realProfile?.id, impersonating]);
 
-  if (!profile) return <Screen scroll={false}><Text>{t('app.loading')}</Text></Screen>;
+  if (!profile) return null;
 
+  const tier = getAccessTier(profile);
+  const trialDays = trialDaysRemaining(profile);
   const childName = profile.full_name?.split(' ')[0] ?? '';
-  const expires   = profile.subscription_expires ? new Date(profile.subscription_expires) : null;
-  const trialDays = expires ? differenceInCalendarDays(expires, new Date()) : null;
-
   const xp    = stats?.total_xp ?? 0;
   const level = stats?.level    ?? 1;
 
   return (
     <Screen>
-      {/* Trial banner */}
-      {profile.subscription_status === 'trial' && trialDays !== null && trialDays >= 0 ? (
+      {tier === 'trial' && trialDays !== null ? (
         <View style={styles.trialBanner}>
           <View style={{ flex: 1 }}>
             <Text style={styles.trialTitle}>
               {trialDays === 0
-                ? t('home.trial.bannerLastDay')
-                : t('home.trial.banner', { days: trialDays })}
+                ? 'Deneme bugün bitiyor!'
+                : `Deneme süreci: ${trialDays} gün kaldı`}
             </Text>
           </View>
-          <Button
-            label={t('home.trial.cta')}
-            variant="primary"
-            size="md"
-            onPress={() => { /* Stage 9 paywall */ }}
-          />
+          <Button label="Yükselt" variant="primary" size="md" onPress={() => router.push('/paywall')} />
+        </View>
+      ) : tier === 'free' ? (
+        <View style={styles.trialBanner}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.trialTitle}>Ücretsiz Plan</Text>
+            <Text style={styles.trialSubtitle}>5 modül · 8 kelime / kategori</Text>
+          </View>
+          <Button label="Yükselt" variant="primary" size="md" onPress={() => router.push('/paywall')} />
         </View>
       ) : null}
 
-      {/* Greeting */}
       <View style={styles.greetingRow}>
-        <View style={styles.avatarBubble}>
-          <Text style={styles.avatarEmoji}>{profile.child_avatar_emoji ?? '🦁'}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.greeting}>
-            {t('home.welcomeBack', { name: childName })}
-          </Text>
+        <CharacterRenderer
+          base={baseChar ? { id: baseChar.id, asset_url: baseChar.asset_url, asset_type: baseChar.asset_type } : null}
+          size={64}
+          fallbackEmoji={profile.child_avatar_emoji ?? '🦁'}
+        />
+        <View style={{ flex: 1, marginLeft: theme.spacing[4] }}>
+          <Text style={styles.greeting}>Merhaba, {childName}!</Text>
           <View style={styles.badgeRow}>
-            <Badge label={t('home.level', { level })} variant="info" />
+            <Badge label={`Sv ${level}`} variant="info" />
             <View style={{ width: 8 }} />
-            <Badge label={t('home.xp', { count: xp })} variant="success" />
+            <Badge label={`${xp} XP`} variant="success" />
+            {stats?.current_streak ? (
+              <>
+                <View style={{ width: 8 }} />
+                <Badge label={`🔥 ${stats.current_streak}`} variant="warning" />
+              </>
+            ) : null}
           </View>
         </View>
       </View>
 
-      {/* Today's lesson — launches "tani" with all categories (warm-up) */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>{t('home.todaysLesson')}</Text>
-        <Text style={styles.cardSubtitle}>
-          Hazır mısın? Hızlı bir tanıma turu başlayalım.
-        </Text>
+        <Text style={styles.cardTitle}>Bugünün Dersi</Text>
+        <Text style={styles.cardSubtitle}>Hızlı bir tanıma turu başlayalım.</Text>
         <Button
-          label={t('home.keepGoing')}
-          variant="cta"
-          size="lg"
-          fullWidth
+          label="Devam Et"
+          variant="cta" size="lg" fullWidth
           onPress={() => router.push('/session/tani')}
           style={{ marginTop: theme.spacing[4] }}
         />
@@ -97,17 +113,12 @@ export default function HomeTab() {
 
       <View style={{ height: theme.spacing[3] }} />
 
-      {/* All categories button */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Tüm kategoriler</Text>
-        <Text style={styles.cardSubtitle}>
-          Bir konu seçip kelimeleri keşfet.
-        </Text>
+        <Text style={styles.cardTitle}>Tüm Oyunlar</Text>
+        <Text style={styles.cardSubtitle}>Bir oyun seç ve oynamaya başla.</Text>
         <Button
-          label="Öğren'e git"
-          variant="secondary"
-          size="lg"
-          fullWidth
+          label="Öğren'e Git"
+          variant="secondary" size="lg" fullWidth
           onPress={() => router.push('/(tabs)/learn')}
           style={{ marginTop: theme.spacing[4] }}
         />
@@ -118,51 +129,21 @@ export default function HomeTab() {
 
 const styles = StyleSheet.create({
   trialBanner: {
-    flexDirection: 'row',
-    alignItems:    'center',
+    flexDirection: 'row', alignItems: 'center',
     backgroundColor: theme.colors.feedback.warningSubtle,
-    padding:      theme.spacing[3],
-    borderRadius: theme.radius.lg,
-    marginBottom: theme.spacing[5],
+    padding: theme.spacing[3], borderRadius: theme.radius.lg,
+    marginBottom: theme.spacing[5], gap: theme.spacing[2],
   },
-  trialTitle: {
-    ...theme.typography.bodyLarge,
-    color: theme.colors.text.primary,
-    fontFamily: theme.typography.bodyLarge.fontFamily,
-  },
-  greetingRow: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    marginBottom:  theme.spacing[6],
-  },
-  avatarBubble: {
-    width: 64, height: 64,
-    borderRadius: 32,
-    backgroundColor: theme.colors.brand.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: theme.spacing[4],
-    ...theme.shadow.sm,
-  },
-  avatarEmoji: { fontSize: 36 },
+  trialTitle: { ...theme.typography.bodyLarge, fontFamily: theme.typography.bodyLarge.fontFamily, color: theme.colors.text.primary },
+  trialSubtitle: { ...theme.typography.bodySmall, color: theme.colors.text.secondary },
+  greetingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing[6] },
   greeting:    { ...theme.typography.h3, color: theme.colors.text.primary },
-  badgeRow: {
-    flexDirection: 'row',
-    marginTop: theme.spacing[2],
-  },
+  badgeRow: { flexDirection: 'row', marginTop: theme.spacing[2], flexWrap: 'wrap' },
   card: {
     backgroundColor: theme.colors.background.secondary,
-    padding: theme.spacing[5],
-    borderRadius: theme.radius.xl,
+    padding: theme.spacing[5], borderRadius: theme.radius.xl,
     ...theme.shadow.md,
   },
-  cardTitle: {
-    ...theme.typography.h3,
-    color: theme.colors.text.primary,
-  },
-  cardSubtitle: {
-    ...theme.typography.body,
-    color: theme.colors.text.muted,
-    marginTop: theme.spacing[2],
-  },
+  cardTitle: { ...theme.typography.h3, color: theme.colors.text.primary },
+  cardSubtitle: { ...theme.typography.body, color: theme.colors.text.muted, marginTop: theme.spacing[2] },
 });

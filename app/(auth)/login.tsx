@@ -24,8 +24,8 @@ export default function LoginScreen() {
     await form.submit(async (values) => {
       const res = await signIn(values.email, values.password);
       if (!res.ok) {
-        const localized = res.error.startsWith('auth.') ? t(res.error) : res.error;
-        setServerError(localized);
+        const localized = res.error!.startsWith('auth.') ? t(res.error!) : res.error;
+        setServerError(localized!);
       }
       // useProtectedRoute redirects on success.
     });

@@ -12,6 +12,12 @@ export default function Index() {
   if (status === 'unauthenticated' || status === 'awaitingEmailVerify') {
     return <Redirect href="/(auth)/welcome" />;
   }
+  if (status === 'needsRoleChoice') {
+    return <Redirect href="/(auth)/role-choice" />;
+  }
+  if (status === 'needsTeacherSignup') {
+    return <Redirect href="/(auth)/teacher-signup" />;
+  }
   if (status === 'needsOnboarding') {
     return <Redirect href="/(onboarding)/child-age" />;
   }
