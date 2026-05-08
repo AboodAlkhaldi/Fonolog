@@ -1,21 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native';
+import { View, Text, StyleSheet, Pressable, FlatList, Modal, ScrollView } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
+import { FileSystemUploadType } from 'expo-file-system/legacy';
 
-import { Screen, Loading, Button, Badge } from '@/components';
+import { Screen, Loading, Button, Badge, Input } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/store/alert';
+import { checkUsage, recordUsage } from '@/lib/entitlements';
 import { theme } from '@/theme';
 
 export default function TeacherStudentDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const impersonating = useAuth((s) => s.impersonating);
+  const teacherProfile = useAuth((s) => s.profile);
   const [profile,   setProfile]   = useState<any>(null);
   const [character, setCharacter] = useState<any>(null);
   const [sessions,  setSessions]  = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [teacherNotes, setTeacherNotes] = useState('');
+  const [generating, setGenerating] = useState(false);
 
   const load = async () => {
     if (!id) return;
@@ -46,6 +55,10 @@ export default function TeacherStudentDetail() {
   useEffect(() => { load(); }, [id, impersonating]);
 
   const onUnlink = () => {
+    if (impersonating === 'teacher' || id === '__preview__') {
+      showAlert('Önizleme', 'Bu işlem önizleme modunda kullanılamaz.');
+      return;
+    }
     showAlert('Öğrenciyi Sil', 'Bu öğrenciyi listenden çıkarmak istediğinden emin misin? (Öğrencinin hesabı silinmeyecek.)', [
       { text: 'Vazgeç', style: 'cancel' },
       {
@@ -60,6 +73,10 @@ export default function TeacherStudentDetail() {
   };
 
   const onSendNotification = () => {
+    if (impersonating === 'teacher' || id === '__preview__') {
+      showAlert('Önizleme', 'Bu işlem önizleme modunda kullanılamaz.');
+      return;
+    }
     if (templates.length === 0) { showAlert('Bilgi', 'Henüz bildirim şablonu yok.'); return; }
     showAlert(
       'Bildirim Gönder',
@@ -93,34 +110,101 @@ export default function TeacherStudentDetail() {
   };
 
   const onAssignHomework = () => {
+    if (impersonating === 'teacher' || id === '__preview__') {
+      showAlert('Önizleme', 'Ödev oluşturma yalnızca gerçek öğrenciler için kullanılabilir.');
+      return;
+    }
     router.push(`/teacher/assignments/new?studentId=${id}`);
   };
 
+  const onOpenNotes = () => {
+    if (impersonating === 'teacher' || id === '__preview__') {
+      showAlert('Önizleme', 'PDF raporu yalnızca gerçek öğrenci profillerinde oluşturulabilir.');
+      return;
+    }
+    setNotesOpen(true);
+  };
+
   const onGenerateReport = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-pdf-report`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session?.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ student_id: id }),
-    });
-    if (!res.ok) { showAlert('Hata', await res.text()); return; }
-    const { html } = await res.json();
+    // Quota check first (trial: 2 / hafta).
+    const usage = await checkUsage(teacherProfile, 'pdf_teacher');
+    if (!usage.allowed) {
+      showAlert(
+        'Kota Doldu',
+        'Bu hafta PDF rapor kotanı kullandın. Sınırsız rapor için Pro\'ya yükselt.',
+        [
+          { text: 'Vazgeç', style: 'cancel' },
+          { text: 'Pro\'ya Geç', onPress: () => router.push('/paywall') },
+        ],
+      );
+      return;
+    }
+    setGenerating(true);
     try {
-      const RNHTMLtoPDF = (await import('react-native-html-to-pdf')).default;
-      const Sharing = await import('expo-sharing');
-      const fileName = `rapor-${new Date().toISOString().split('T')[0]}`;
-      const file = await RNHTMLtoPDF.convert({ html, fileName, directory: 'Documents' });
-      if (!file.filePath) { showAlert('Hata', 'PDF oluşturulamadı.'); return; }
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(file.filePath);
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-pdf-report`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          student_id:    id,
+          teacher_notes: teacherNotes || undefined,
+        }),
+      });
+      if (!res.ok) { showAlert('Hata', await res.text()); return; }
+      const { html } = await res.json();
+
+      const { uri } = await Print.printToFileAsync({ html });
+
+      // Upload to Supabase Storage via native HTTP (avoids Blob/ArrayBuffer issues in RN).
+      const dateStr = new Date().toISOString().split('T')[0];
+      const path = `${teacherProfile?.id}/${id}-${dateStr}-${Date.now()}.pdf`;
+      const uploadUrl = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/reports/${path}`;
+      const uploadResult = await FileSystem.uploadAsync(uploadUrl, uri, {
+        httpMethod: 'POST',
+        uploadType: FileSystemUploadType.BINARY_CONTENT,
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/pdf',
+          'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
+        },
+      });
+
+      let publicUrl: string | null = null;
+      if (uploadResult.status >= 200 && uploadResult.status < 300) {
+        const { data } = supabase.storage.from('reports').getPublicUrl(path);
+        publicUrl = data.publicUrl;
+        await supabase.from('notifications').insert({
+          user_id: id,
+          type:    'teacher_note',
+          title:   'Yeni İlerleme Raporu',
+          body:    'Öğretmenin senin için bir PDF rapor hazırladı.',
+          payload: { report_url: publicUrl, teacher_id: teacherProfile?.id, has_notes: !!teacherNotes },
+        });
       } else {
-        showAlert('Tamam', `PDF oluşturuldu: ${file.filePath}`);
+        console.warn('[pdf] upload failed', uploadResult.status, uploadResult.body);
       }
+
+      await recordUsage(teacherProfile, 'pdf_teacher');
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+      }
+
+      setNotesOpen(false);
+      setTeacherNotes('');
+      showAlert(
+        'Rapor Oluşturuldu',
+        publicUrl
+          ? 'Rapor öğrenciye iletildi ve bildirim gönderildi.'
+          : 'Rapor oluşturuldu (paylaşıldı). Öğrenciye iletilemedi.',
+      );
     } catch (e) {
       showAlert('Hata', 'PDF oluşturulurken hata: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -155,7 +239,7 @@ export default function TeacherStudentDetail() {
             <View style={styles.actions}>
               <ActionBtn icon="clipboard-outline"   label="Ödev Ver"        onPress={onAssignHomework} />
               <ActionBtn icon="chatbubble-outline"  label="Bildirim Gönder" onPress={onSendNotification} />
-              <ActionBtn icon="document-outline"    label="PDF Rapor"       onPress={onGenerateReport} />
+              <ActionBtn icon="document-outline"    label="PDF Rapor"       onPress={onOpenNotes} />
               <ActionBtn icon="trash-outline"       label="Sil"             onPress={onUnlink} danger />
             </View>
 
@@ -171,6 +255,45 @@ export default function TeacherStudentDetail() {
           </View>
         )}
       />
+
+      {/* Teacher-notes modal for PDF report */}
+      <Modal
+        visible={notesOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !generating && setNotesOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              <Text style={styles.modalTitle}>Öğretmen Notları</Text>
+              <Text style={styles.modalSubtitle}>
+                Bu notlar yalnızca PDF raporda görünür ve aileyle paylaşılır.
+              </Text>
+              <Input
+                value={teacherNotes}
+                onChangeText={setTeacherNotes}
+                placeholder="Çocuğun gelişimi hakkında özel notlar..."
+                multiline
+                numberOfLines={6}
+              />
+              <Button
+                label="Raporu Oluştur ve Gönder"
+                variant="cta" size="lg" fullWidth
+                loading={generating}
+                onPress={onGenerateReport}
+                style={{ marginTop: theme.spacing[3] }}
+              />
+              <Button
+                label="Vazgeç"
+                variant="ghost" size="md" fullWidth
+                onPress={() => !generating && setNotesOpen(false)}
+                style={{ marginTop: theme.spacing[2] }}
+              />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -212,4 +335,19 @@ const styles = StyleSheet.create({
   sessionMod: { ...theme.typography.bodyLarge, fontFamily: theme.typography.bodyLarge.fontFamily, color: theme.colors.text.primary },
   sessionMeta: { ...theme.typography.caption, color: theme.colors.text.muted, marginTop: 2 },
   empty: { ...theme.typography.body, color: theme.colors.text.muted, textAlign: 'center', paddingVertical: theme.spacing[6] },
+  modalBackdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: theme.spacing[5],
+  },
+  modalCard: {
+    backgroundColor: theme.colors.background.primary,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing[5],
+    width: '100%',
+    maxHeight: '70%',
+    ...theme.shadow.md,
+  },
+  modalTitle: { ...theme.typography.h2, color: theme.colors.text.primary, marginBottom: theme.spacing[1] },
+  modalSubtitle: { ...theme.typography.bodySmall, color: theme.colors.text.muted, marginBottom: theme.spacing[3] },
 });

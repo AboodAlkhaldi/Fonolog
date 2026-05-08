@@ -8,6 +8,7 @@ import { Screen, Button } from '@/components';
 import { useAuth } from '@/store/auth';
 import { withPreviewPlaceholders } from '@/lib/preview-profile';
 import { showAlert } from '@/store/alert';
+import { subscriptionLabel } from '@/lib/access-tier';
 import { theme } from '@/theme';
 
 export default function TeacherSettings() {
@@ -54,23 +55,19 @@ export default function TeacherSettings() {
       </View>
 
       {/* Subscription */}
-      <View style={styles.card}>
+      <Pressable style={styles.card} onPress={() => router.push('/settings/plan-details')}>
         <View style={styles.rowBetween}>
           <Text style={styles.cardTitle}>Abonelik</Text>
-          <Text style={styles.tag}>{profile.subscription_status}</Text>
+          <Text style={styles.tag}>{subscriptionLabel(profile.subscription_status)}</Text>
         </View>
         {trialDays !== null ? (
-          <Text style={styles.cardDesc}>Deneme süreci: {trialDays} gün kaldı</Text>
-        ) : null}
-        <Button
-          label="Aboneliği Yükselt"
-          variant="primary"
-          size="md"
-          fullWidth
-          onPress={() => router.push('/paywall')}
-          style={{ marginTop: theme.spacing[3] }}
-        />
-      </View>
+          <Text style={styles.cardDesc}>Deneme süreci: {trialDays} gün kaldı · Detaylar →</Text>
+        ) : profile.subscription_status === 'free' ? (
+          <Text style={styles.cardDesc}>Ücretsiz plan · Detaylar →</Text>
+        ) : (
+          <Text style={styles.cardDesc}>Aktif · Detaylar →</Text>
+        )}
+      </Pressable>
 
       <Pressable onPress={onSignOut} style={styles.signOut}>
         <Ionicons name="log-out-outline" size={20} color={theme.colors.feedback.errorText} />

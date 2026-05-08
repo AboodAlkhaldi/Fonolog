@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Button } from '@/components';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 
 export default function TeacherPreview() {
@@ -17,13 +18,13 @@ export default function TeacherPreview() {
 
   const launch = () => {
     if (isAdminPreviewingTeacher) {
-      Alert.alert(
+      showAlert(
         'Buradan giremezsin',
         'Öğretmen görünümündeyken öğrenci görünümüne geçemezsin. Yönetim paneline dön ve oradan "Öğrenci" sekmesini kullan.',
       );
       return;
     }
-    Alert.alert(
+    showAlert(
       'Öğrenci Görünümü',
       isTrial
         ? 'Deneme sürecinde günde 20 dakika öğrenci görünümünü test edebilirsin.'

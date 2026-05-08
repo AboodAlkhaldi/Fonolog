@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, FlatList } from 'react-native';
-import { router } from 'expo-router';
+import { View, Text, Pressable, StyleSheet, FlatList, ScrollView } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Button, Input } from '@/components';
@@ -8,30 +8,36 @@ import { showAlert } from '@/store/alert';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/auth';
 import { contentRepository, listModules } from '@/domain';
+import { checkUsage, recordUsage } from '@/lib/entitlements';
+import { getAccessTier, canPlayModule } from '@/lib/access-tier';
 import { theme } from '@/theme';
-
-const STAGE_4_AVAILABLE = new Set(['tani','tamamla','heceBirlestir','uyak','kategori']);
 
 export default function NewAssignment() {
   const teacher = useAuth((s) => s.user);
-  const [step, setStep] = useState<'student'|'words'|'modules'|'meta'>('student');
+  const profile = useAuth((s) => s.profile);
+  const impersonating = useAuth((s) => s.impersonating);
+  const params = useLocalSearchParams<{ studentId?: string }>();
+  const [step, setStep] = useState<'student'|'words'|'modules'|'meta'>(
+    params.studentId ? 'words' : 'student',
+  );
 
   const [students, setStudents] = useState<any[]>([]);
-  const [studentId, setStudentId] = useState('');
+  const [studentId, setStudentId] = useState(params.studentId ?? '');
 
   const [allWords, setAllWords] = useState<any[]>([]);
   const [pickedWords, setPickedWords] = useState<Set<string>>(new Set());
 
-  const modules = listModules().filter((m) => STAGE_4_AVAILABLE.has(m.id));
+  const modules = listModules();
   const [pickedModules, setPickedModules] = useState<Set<string>>(new Set());
+  const [studentAccessTier, setStudentAccessTier] = useState<ReturnType<typeof getAccessTier>>('free');
 
   const [title, setTitle] = useState('');
+  const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-    useEffect(() => {
+  useEffect(() => {
     if (!teacher) return;
     (async () => {
-      // Only load students LINKED to this teacher (RLS-friendly).
       const { data: links } = await supabase
         .from('teacher_students')
         .select('student_id')
@@ -53,27 +59,81 @@ export default function NewAssignment() {
     })();
   }, [teacher?.id]);
 
+  // Fetch selected student's profile to compute their access tier.
+  useEffect(() => {
+    if (!studentId) return;
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('subscription_status,subscription_expires,role')
+        .eq('id', studentId)
+        .maybeSingle();
+      setStudentAccessTier(getAccessTier(data ?? null));
+    })();
+  }, [studentId]);
 
   const submit = async () => {
     if (!teacher) return;
+    if (impersonating === 'teacher') {
+      showAlert('Önizleme', 'Önizleme modunda ödev oluşturulamaz.');
+      return;
+    }
     if (!studentId || pickedWords.size === 0 || pickedModules.size === 0 || !title) {
       showAlert('Eksik', 'Tüm adımları tamamla.');
       return;
     }
+
+    // Quota check (trial: 2 ödev / hafta)
+    const usage = await checkUsage(profile, 'assignment_create');
+    if (!usage.allowed) {
+      showAlert(
+        'Kota Doldu',
+        `${usage.reason} Sınırsız ödev için Pro'ya yükselt.`,
+        [
+          { text: 'Vazgeç', style: 'cancel' },
+          { text: 'Pro\'ya Geç', onPress: () => router.push('/paywall') },
+        ],
+      );
+      return;
+    }
+
     setSubmitting(true);
 
-    const { error } = await supabase.from('assignments').insert({
-      teacher_id: teacher.id,
-      student_id: studentId,
-      title,
-      module_ids: Array.from(pickedModules),
-      word_ids:   Array.from(pickedWords),
-      status:     'assigned',
+    const { data: assignment, error } = await supabase
+      .from('assignments')
+      .insert({
+        teacher_id:   teacher.id,
+        student_id:   studentId,
+        title,
+        instructions: message || null,
+        module_ids:   Array.from(pickedModules),
+        word_ids:     Array.from(pickedWords),
+        status:       'assigned',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      setSubmitting(false);
+      showAlert('Hata', error.message);
+      return;
+    }
+
+    // Notify the student in-app. Best-effort: do not fail the flow if this insert errors.
+    await supabase.from('notifications').insert({
+      user_id: studentId,
+      type:    'assignment_new',
+      title:   'Yeni Ödev',
+      body:    title,
+      payload: { assignment_id: assignment?.id, teacher_id: teacher.id, message },
     });
 
+    await recordUsage(profile, 'assignment_create');
+
     setSubmitting(false);
-    if (error) { showAlert('Hata', error.message); return; }
-    router.back();
+    showAlert('Başarılı', 'Ödev oluşturuldu ve öğrenciye bildirildi.', [
+      { text: 'Tamam', onPress: () => router.back() },
+    ]);
   };
 
   return (
@@ -96,10 +156,17 @@ export default function NewAssignment() {
         <FlatList
           data={students}
           keyExtractor={(s) => s.id}
+          ListEmptyComponent={
+            <Text style={styles.empty}>
+              {impersonating === 'teacher'
+                ? 'Önizleme modunda öğrenci listesi gösterilmez.'
+                : 'Henüz bağlı öğrenci yok.'}
+            </Text>
+          }
           renderItem={({ item }) => (
             <Pressable
               style={[styles.row, studentId === item.id && styles.rowSelected]}
-              onPress={() => { setStudentId(item.id); setStep('words'); }}
+              onPress={() => { setStudentId(item.id); setPickedModules(new Set()); setStep('words'); }}
             >
               <Text style={{ fontSize: 24 }}>{item.child_avatar_emoji ?? '🦁'}</Text>
               <Text style={styles.rowText}>{item.full_name}</Text>
@@ -109,12 +176,14 @@ export default function NewAssignment() {
       )}
 
       {step === 'words' && (
-        <>
+        <View style={{ flex: 1 }}>
           <Text style={styles.hint}>Kelimeler ({pickedWords.size} seçildi)</Text>
           <FlatList
+            style={{ flex: 1 }}
             data={allWords}
             numColumns={3}
             keyExtractor={(w) => w.id ?? w.word}
+            contentContainerStyle={{ paddingBottom: theme.spacing[3] }}
             renderItem={({ item }) => {
               const selected = pickedWords.has(item.id);
               return (
@@ -133,38 +202,80 @@ export default function NewAssignment() {
             }}
           />
           <Button label="Devam" variant="cta" size="md" onPress={() => setStep('modules')} disabled={pickedWords.size === 0} />
-        </>
+        </View>
       )}
 
       {step === 'modules' && (
-        <>
-          <Text style={styles.hint}>Oyunlar ({pickedModules.size} seçildi)</Text>
-          {modules.map((m) => {
-            const selected = pickedModules.has(m.id);
-            return (
-              <Pressable
-                key={m.id}
-                onPress={() => {
-                  const next = new Set(pickedModules);
-                  selected ? next.delete(m.id) : next.add(m.id);
-                  setPickedModules(next);
-                }}
-                style={[styles.row, selected && styles.rowSelected]}
-              >
-                <Text style={{ fontSize: 24 }}>{m.icon}</Text>
-                <Text style={styles.rowText}>{m.title}</Text>
-              </Pressable>
-            );
-          })}
+        <View style={{ flex: 1 }}>
+          <Text style={styles.hint}>Oyunlar ({pickedModules.size} seçildi) · Öğrenci planına göre filtrelendi</Text>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: theme.spacing[3] }}
+          >
+            {modules.map((m) => {
+              const accessible = canPlayModule(studentAccessTier, m);
+              const selected   = pickedModules.has(m.id);
+              const lockReason = !accessible
+                ? (m.usesPronunciation ? 'Telaffuz — Pro gerektirir' : `Seviye ${m.level} — planında yok`)
+                : null;
+              return (
+                <Pressable
+                  key={m.id}
+                  onPress={() => {
+                    if (!accessible) {
+                      showAlert('Kilitli', `Bu oyun öğrencinin planında açık değil: ${lockReason}`);
+                      return;
+                    }
+                    const next = new Set(pickedModules);
+                    selected ? next.delete(m.id) : next.add(m.id);
+                    setPickedModules(next);
+                  }}
+                  style={[styles.row, selected && styles.rowSelected, !accessible && styles.rowLocked]}
+                >
+                  <Text style={{ fontSize: 24, opacity: accessible ? 1 : 0.4 }}>{m.icon}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.rowText, !accessible && styles.rowTextLocked]}>{m.title}</Text>
+                    {lockReason
+                      ? <Text style={styles.lockLabel}>{lockReason}</Text>
+                      : <Text style={styles.rowSubtext}>{m.description}</Text>
+                    }
+                  </View>
+                  {!accessible && (
+                    <Ionicons name="lock-closed" size={16} color={theme.colors.text.muted} />
+                  )}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
           <Button label="Devam" variant="cta" size="md" onPress={() => setStep('meta')} disabled={pickedModules.size === 0} />
-        </>
+        </View>
       )}
 
       {step === 'meta' && (
-        <>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: theme.spacing[6] }}
+          keyboardShouldPersistTaps="handled"
+        >
           <Input label="Başlık" value={title} onChangeText={setTitle} required />
-          <Button label="Ödevi Oluştur" variant="cta" size="lg" fullWidth loading={submitting} onPress={submit} />
-        </>
+          <Input
+            label="Mesaj (öğrenciye not)"
+            value={message}
+            onChangeText={setMessage}
+            placeholder="Bu ödevi neden verdiğini ya da ipuçlarını yaz..."
+            multiline
+            numberOfLines={4}
+          />
+          <Button
+            label="Ödevi Oluştur"
+            variant="cta"
+            size="lg"
+            fullWidth
+            loading={submitting}
+            onPress={submit}
+            style={{ marginTop: theme.spacing[3] }}
+          />
+        </ScrollView>
       )}
     </Screen>
   );
@@ -193,7 +304,11 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   rowSelected: { borderColor: theme.colors.brand.primary },
+  rowLocked:   { opacity: 0.55 },
   rowText: { ...theme.typography.body, color: theme.colors.text.primary },
+  rowTextLocked: { color: theme.colors.text.muted },
+  rowSubtext: { ...theme.typography.caption, color: theme.colors.text.muted, marginTop: 2 },
+  lockLabel:  { ...theme.typography.caption, color: theme.colors.feedback.errorText, marginTop: 2 },
   wordTile: {
     flex: 1, margin: 4, padding: 8,
     backgroundColor: theme.colors.background.secondary,
@@ -204,4 +319,10 @@ const styles = StyleSheet.create({
   },
   wordTileSelected: { borderColor: theme.colors.brand.primary },
   wordTileText: { ...theme.typography.caption, color: theme.colors.text.primary },
+  empty: {
+    ...theme.typography.body,
+    color: theme.colors.text.muted,
+    textAlign: 'center',
+    paddingVertical: theme.spacing[8],
+  },
 });

@@ -4,9 +4,13 @@ import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Loading, Button, Badge } from '@/components';
+import { NotificationBell } from '@/components/common/NotificationBell';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+
+const PREVIEW_ID = '__preview__';
 
 interface Row {
   id: string;
@@ -32,7 +36,7 @@ export default function TeacherHome() {
     // instead of fetching the admin's actual linked students.
     if (impersonating === 'teacher') {
       setRows([{
-        id: 'preview-demo',
+        id: PREVIEW_ID,
         full_name: 'Öğrenci Adı',
         email: 'ornek@okumadedektifi.com',
         child_avatar_emoji: '🦁',
@@ -93,6 +97,7 @@ export default function TeacherHome() {
           <Text style={styles.title}>Öğrencilerim</Text>
           <Text style={styles.subtitle}>{rows.length} öğrenci</Text>
         </View>
+        <NotificationBell />
         <Button
           label="+ Ekle"
           variant="primary"
@@ -115,7 +120,13 @@ export default function TeacherHome() {
           keyExtractor={(r) => r.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           renderItem={({ item }) => (
-            <Pressable style={styles.card} onPress={() => router.push(`/teacher/student/${item.id}`)}>
+            <Pressable style={styles.card} onPress={() => {
+              if (item.id === PREVIEW_ID) {
+                showAlert('Önizleme', 'Bu kart yalnızca önizleme amaçlıdır. Gerçek öğrenci eklemek için "+ Ekle" butonunu kullan.');
+                return;
+              }
+              router.push(`/teacher/student/${item.id}`);
+            }}>
               <Text style={styles.avatar}>{item.child_avatar_emoji ?? '🦁'}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.full_name}</Text>

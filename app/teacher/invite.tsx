@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Input, Button } from '@/components';
 import { supabase } from '@/lib/supabase';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 
 export default function InviteStudent() {
@@ -14,17 +15,33 @@ export default function InviteStudent() {
   const onInvite = async () => {
     if (!email.trim()) return;
     setSubmitting(true);
+
+    // Pre-flight cap check (server-truth). Trial → 1 student.
+    const { data: canLink } = await supabase.rpc('can_link_more_students');
+    if (canLink === false) {
+      setSubmitting(false);
+      showAlert(
+        'Sınıra Ulaşıldı',
+        'Deneme sürecinde sadece 1 öğrenci ekleyebilirsin. Sınırsız öğrenci için Pro\'ya yükselt.',
+        [
+          { text: 'Vazgeç', style: 'cancel' },
+          { text: 'Pro\'ya Geç', onPress: () => router.push('/paywall') },
+        ],
+      );
+      return;
+    }
+
     const { data, error } = await supabase.rpc('invite_student', { p_email: email.trim().toLowerCase() });
     setSubmitting(false);
 
-    if (error) { Alert.alert('Hata', error.message); return; }
+    if (error) { showAlert('Hata', error.message); return; }
     const row = Array.isArray(data) ? data[0] : data;
     if (row?.status === 'accepted') {
-      Alert.alert('Başarılı', row.message ?? 'Öğrenci eklendi.', [
+      showAlert('Başarılı', row.message ?? 'Öğrenci eklendi.', [
         { text: 'Tamam', onPress: () => router.back() },
       ]);
     } else {
-      Alert.alert('Eklenemedi', row?.message ?? 'Beklenmeyen hata.');
+      showAlert('Eklenemedi', row?.message ?? 'Beklenmeyen hata.');
     }
   };
 
