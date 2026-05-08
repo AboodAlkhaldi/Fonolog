@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Button, Input, Loading } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { contentRepository } from '@/domain';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 
 export default function CategoryEditor() {
@@ -35,7 +36,7 @@ export default function CategoryEditor() {
   }, [id]);
 
   const onSubmit = async () => {
-    if (!name) { Alert.alert('Eksik', 'Kategori adı zorunlu.'); return; }
+    if (!name) { showAlert('Eksik', 'Kategori adı zorunlu.'); return; }
     setSubmitting(true);
 
     const payload: any = {
@@ -50,7 +51,7 @@ export default function CategoryEditor() {
       ? await supabase.from('categories').insert(payload).select().single()
       : await supabase.from('categories').update(payload).eq('id', id).select().single();
 
-    if (result.error) { Alert.alert('Hata', result.error.message); setSubmitting(false); return; }
+    if (result.error) { showAlert('Hata', result.error.message); setSubmitting(false); return; }
     contentRepository.invalidate();
     router.back();
   };

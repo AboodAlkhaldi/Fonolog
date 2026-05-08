@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Loading, Button } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { contentRepository } from '@/domain';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 
 export default function AdminCategories() {
@@ -20,16 +21,16 @@ export default function AdminCategories() {
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
-  const onDelete = (cat: any) => Alert.alert('Sil', `"${cat.name}" kategorisini silmek istediğine emin misin?`, [
+  const onDelete = (cat: any) => showAlert('Sil', `"${cat.name}" kategorisini silmek istediğine emin misin?`, [
     { text: 'Vazgeç', style: 'cancel' },
     { text: 'Sil', style: 'destructive', onPress: async () => {
       const { error } = await supabase.from('categories').update({ is_active: false } as any).eq('id', cat.id);
-      if (error) Alert.alert('Hata', error.message);
+      if (error) showAlert('Hata', error.message);
       else { contentRepository.invalidate(); load(); }
     }},
   ]);
 
-  const showActions = (cat: any) => Alert.alert(cat.name, '', [
+  const showActions = (cat: any) => showAlert(cat.name, '', [
     { text: 'Düzenle', onPress: () => router.push(`/admin/content/category/${cat.id}`) },
     { text: 'Sil', style: 'destructive', onPress: () => onDelete(cat) },
     { text: 'Vazgeç', style: 'cancel' },

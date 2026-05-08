@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Alert } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Loading, Button, Input } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { contentRepository } from '@/domain';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 
 interface WordRow {
@@ -29,19 +30,19 @@ export default function AdminWords() {
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
-  const onDelete = (w: WordRow) => Alert.alert('Sil', `"${w.word_text}" kelimesini silmek istediğine emin misin?`, [
+  const onDelete = (w: WordRow) => showAlert('Sil', `"${w.word_text}" kelimesini silmek istediğine emin misin?`, [
     { text: 'Vazgeç', style: 'cancel' },
     {
       text: 'Sil', style: 'destructive',
       onPress: async () => {
         const { error } = await supabase.from('words').update({ is_active: false } as any).eq('id', w.id);
-        if (error) Alert.alert('Hata', error.message);
+        if (error) showAlert('Hata', error.message);
         else { contentRepository.invalidate(); load(); }
       },
     },
   ]);
 
-  const showActions = (w: WordRow) => Alert.alert(w.word_text, '', [
+  const showActions = (w: WordRow) => showAlert(w.word_text, '', [
     { text: 'Düzenle', onPress: () => router.push(`/admin/content/word/${w.id}`) },
     { text: 'Sil', style: 'destructive', onPress: () => onDelete(w) },
     { text: 'Vazgeç', style: 'cancel' },

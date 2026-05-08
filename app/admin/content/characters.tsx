@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Loading, Button, Badge } from '@/components';
 import { supabase } from '@/lib/supabase';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 
 type Tab = 'base' | 'extras' | 'cats';
@@ -30,7 +31,7 @@ export default function AdminCharacters() {
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
-  const onAdd = () => Alert.alert('Ne ekleyeceksin?', '', [
+  const onAdd = () => showAlert('Ne ekleyeceksin?', '', [
     { text: 'Ana Karakter',     onPress: () => router.push('/admin/content/character-edit/base/new') },
     { text: 'Aksesuar Kategorisi', onPress: () => router.push('/admin/content/character-edit/cat/new') },
     { text: 'Aksesuar (Extra)',  onPress: () => router.push('/admin/content/character-edit/extra/new') },

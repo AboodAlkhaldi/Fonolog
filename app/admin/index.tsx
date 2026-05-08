@@ -4,6 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Loading } from '@/components';
+import { NotificationBell } from '@/components/common/NotificationBell';
 import { supabase } from '@/lib/supabase';
 import { theme } from '@/theme';
 
@@ -48,7 +49,10 @@ export default function AdminDashboard() {
 
   return (
     <Screen scroll={false}>
-      <Text style={styles.title}>Yönetim Paneli</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Yönetim Paneli</Text>
+        <NotificationBell />
+      </View>
       <FlatList
         data={[]}
         renderItem={null}
@@ -101,7 +105,8 @@ function UserCard({ user }: { user: UserRow }) {
 }
 
 const styles = StyleSheet.create({
-  title: { ...theme.typography.h1, color: theme.colors.text.primary, marginBottom: theme.spacing[4] },
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing[4] },
+  title: { ...theme.typography.h1, color: theme.colors.text.primary, flex: 1 },
   sectionTitle: { ...theme.typography.h3, color: theme.colors.text.primary, marginBottom: theme.spacing[2], marginTop: theme.spacing[2] },
   card: {
     flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2],
