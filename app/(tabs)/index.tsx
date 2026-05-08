@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 
 import { Screen, Button, Badge } from '@/components';
 import { CharacterRenderer } from '@/components/character/CharacterRenderer';
+import { NotificationBell } from '@/components/common/NotificationBell';
 import { useAuth } from '@/store/auth';
 import { supabase } from '@/lib/supabase';
 import { getAccessTier, trialDaysRemaining } from '@/lib/access-tier';
@@ -57,6 +58,11 @@ export default function HomeTab() {
 
   return (
     <Screen>
+      <View style={styles.topBar}>
+        <View style={{ flex: 1 }} />
+        <NotificationBell />
+      </View>
+
       {tier === 'trial' && trialDays !== null ? (
         <View style={styles.trialBanner}>
           <View style={{ flex: 1 }}>
@@ -72,7 +78,7 @@ export default function HomeTab() {
         <View style={styles.trialBanner}>
           <View style={{ flex: 1 }}>
             <Text style={styles.trialTitle}>Ücretsiz Plan</Text>
-            <Text style={styles.trialSubtitle}>5 modül · 8 kelime / kategori</Text>
+            <Text style={styles.trialSubtitle}>Sınırlı erişim · Hazırlık modülleri</Text>
           </View>
           <Button label="Yükselt" variant="primary" size="md" onPress={() => router.push('/paywall')} />
         </View>
@@ -128,6 +134,7 @@ export default function HomeTab() {
 }
 
 const styles = StyleSheet.create({
+  topBar: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing[2] },
   trialBanner: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: theme.colors.feedback.warningSubtle,

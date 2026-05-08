@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, FlatList } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,21 +6,44 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen, Badge } from '@/components';
 import { listModules, type ModuleDefinition } from '@/domain';
 import { useAuth } from '@/store/auth';
-import { getAccessTier, isModuleLocked } from '@/lib/access-tier';
+import { getAccessTier, isModuleLocked, isModuleLevelLocked } from '@/lib/access-tier';
+import { showAlert } from '@/store/alert';
+import { supabase } from '@/lib/supabase';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
 export default function LearnTab() {
-  const profile = useAuth((s) => s.profile);
-  const tier = getAccessTier(profile);
+  const realProfile   = useAuth((s) => s.profile);
+  const impersonating = useAuth((s) => s.impersonating);
+  const tier    = getAccessTier(realProfile);
   const modules = listModules();
+  const [studentLevel, setStudentLevel] = useState(0);
+
+  useEffect(() => {
+    if (!realProfile || impersonating) return;
+    supabase
+      .from('student_character')
+      .select('level')
+      .eq('student_id', realProfile.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.level != null) setStudentLevel(data.level);
+      });
+  }, [realProfile?.id, impersonating]);
 
   const launch = (m: ModuleDefinition) => {
     if (isModuleLocked(tier, m)) {
       router.push('/paywall');
       return;
     }
-    // No categoryId — session.ts pulls 20 random words from the full pool.
+    if (isModuleLevelLocked(tier, m, studentLevel)) {
+      showAlert(
+        'Seviye Yetersiz',
+        `"${m.title}" oyununu açmak için Seviye ${m.level}'e ulaşman gerekiyor. Şu anki seviyenin: ${studentLevel}.`,
+        [{ text: 'Tamam', style: 'cancel' }],
+      );
+      return;
+    }
     router.push(`/session/${m.id}`);
   };
 
@@ -37,7 +60,9 @@ export default function LearnTab() {
           </View>
         }
         renderItem={({ item: m }) => {
-          const locked = isModuleLocked(tier, m);
+          const planLocked  = isModuleLocked(tier, m);
+          const levelLocked = !planLocked && isModuleLevelLocked(tier, m, studentLevel);
+          const locked      = planLocked || levelLocked;
           return (
             <Pressable
               onPress={() => launch(m)}
@@ -52,7 +77,8 @@ export default function LearnTab() {
                 ) : null}
                 <View style={styles.metaRow}>
                   <Badge label={`Sv ${m.level}`} variant="info" />
-                  {locked ? <Badge label="🔒 Pro" variant="warning" /> : null}
+                  {planLocked  ? <Badge label="🔒 Pro"    variant="warning" /> : null}
+                  {levelLocked ? <Badge label="🔒 Seviye" variant="info"    /> : null}
                 </View>
               </View>
               <Ionicons

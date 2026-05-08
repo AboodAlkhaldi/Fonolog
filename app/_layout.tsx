@@ -41,7 +41,7 @@ import { SpaceMono_400Regular } from '@expo-google-fonts/space-mono';
 
 import { useAuth, type AuthStatus } from '@/store/auth';
 import { initAudio } from '@/audio/audio.service';
-import { initPurchases } from '@/lib/purchases';
+import { bootstrapPurchases } from '@/lib/purchases';
 import { registerForPushNotifications } from '@/lib/notifications';
 import { AlertModal } from '@/components/common/AlertModal';
 import { theme } from '@/theme';
@@ -78,18 +78,16 @@ function useProtectedRoute(status: AuthStatus, role: string | null, impersonatin
 
       case 'authenticated':
         if (role === 'admin' && !impersonating) {
-          // Pure admin mode — keep inside admin
-          if (root !== 'admin' && root !== 'paywall') router.replace('/admin');
+          const validRoots = ['admin', 'paywall', 'notifications', 'settings'];
+          if (!validRoots.includes(root ?? '')) router.replace('/admin');
         } else if (role === 'teacher' && !impersonating) {
-          // Pure teacher mode
-          if (root !== 'teacher' && root !== 'paywall') router.replace('/teacher');
+          const validRoots = ['teacher', 'paywall', 'notifications', 'settings'];
+          if (!validRoots.includes(root ?? '')) router.replace('/teacher');
         } else if (impersonating === 'teacher') {
-          // Admin previewing teacher view — allow admin root briefly during transition
-          const validRoots = ['teacher', 'admin', 'paywall'];
+          const validRoots = ['teacher', 'admin', 'paywall', 'notifications', 'settings'];
           if (!validRoots.includes(root ?? '')) router.replace('/teacher');
         } else {
-          // Student OR admin/teacher impersonating student
-          const validRoots = ['(tabs)', 'session', 'learn', 'paywall', 'admin'];
+          const validRoots = ['(tabs)', 'session', 'learn', 'paywall', 'admin', 'notifications', 'settings'];
           if (!validRoots.includes(root ?? '')) router.replace('/(tabs)');
         }
         return;
@@ -119,7 +117,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (status === 'authenticated' && user?.id) {
-      initPurchases(user.id).catch((e) => console.warn('[boot] purchases', e));
+      bootstrapPurchases(user.id).catch((e) => console.warn('[boot] purchases', e));
       registerForPushNotifications().catch((e) => console.warn('[boot] push', e));
     }
   }, [status, user?.id]);
@@ -155,6 +153,8 @@ export default function RootLayout() {
             <Stack.Screen name="session"       options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="learn"         />
             <Stack.Screen name="paywall"       options={{ presentation: 'modal' }} />
+            <Stack.Screen name="notifications" />
+            <Stack.Screen name="settings"      />
           </Stack>
         </QueryClientProvider>
       </SafeAreaProvider>

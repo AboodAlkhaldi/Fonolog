@@ -3,12 +3,16 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { differenceInCalendarDays } from 'date-fns';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 import { Screen } from '@/components';
 import { useAuth } from '@/store/auth';
 import { supabase } from '@/lib/supabase';
 import { withPreviewPlaceholders } from '@/lib/preview-profile';
 import { showAlert } from '@/store/alert';
+import { checkUsage, recordUsage } from '@/lib/entitlements';
+import { subscriptionLabel } from '@/lib/access-tier';
 import { theme } from '@/theme';
 
 export default function ProfileTab() {
@@ -38,6 +42,49 @@ export default function ProfileTab() {
   const trialDays = expires && profile.subscription_status === 'trial'
     ? Math.max(0, differenceInCalendarDays(expires, new Date())) : null;
 
+  const onGenerateOwnPdf = async () => {
+    if (impersonating) {
+      showAlert('Önizleme', 'Bu işlem önizleme modunda kullanılamaz.');
+      return;
+    }
+    const usage = await checkUsage(realProfile, 'pdf_student');
+    if (!usage.allowed) {
+      showAlert(
+        'Kota Doldu',
+        `Bu hafta ${usage.limit} PDF kotanı kullandın. Sınırsız PDF için Pro'ya yükselt.`,
+        [
+          { text: 'Vazgeç', style: 'cancel' },
+          { text: 'Pro\'ya Geç', onPress: () => router.push('/paywall') },
+        ],
+      );
+      return;
+    }
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-pdf-report`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ student_id: realProfile?.id }),
+      });
+      if (!res.ok) { showAlert('Hata', await res.text()); return; }
+      const { html } = await res.json();
+      const { uri } = await Print.printToFileAsync({ html });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+      }
+      await recordUsage(realProfile, 'pdf_student');
+      const after = await checkUsage(realProfile, 'pdf_student');
+      if (after.limit > 0 && after.remaining >= 0) {
+        showAlert('Tamam', `PDF oluşturuldu. Bu hafta kalan kota: ${after.remaining}/${after.limit}`);
+      }
+    } catch (e) {
+      showAlert('Hata', 'PDF oluşturulurken hata: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  };
+
   const onSignOut = () => {
     if (impersonating) {
       showAlert(
@@ -66,11 +113,11 @@ export default function ProfileTab() {
       </View>
 
       {/* Subscription */}
-      <Pressable style={styles.card} onPress={() => router.push('/paywall')}>
+      <Pressable style={styles.card} onPress={() => router.push('/settings/plan-details')}>
         <View style={styles.cardHeaderRow}>
           <Text style={styles.cardTitle}>Abonelik</Text>
           <View style={[styles.tag, profile.subscription_status === 'trial' && styles.tagTrial]}>
-            <Text style={styles.tagText}>{profile.subscription_status}</Text>
+            <Text style={styles.tagText}>{subscriptionLabel(profile.subscription_status)}</Text>
           </View>
         </View>
         {trialDays !== null ? (
@@ -80,6 +127,15 @@ export default function ProfileTab() {
         ) : (
           <Text style={styles.cardDesc}>Aktif · Detaylar →</Text>
         )}
+      </Pressable>
+
+      {/* PDF Report */}
+      <Pressable style={styles.card} onPress={onGenerateOwnPdf}>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.cardTitle}>📄 PDF Raporu</Text>
+          <Ionicons name="chevron-forward" size={18} color={theme.colors.text.muted} />
+        </View>
+        <Text style={styles.cardDesc}>İlerlemeni PDF olarak indir ve paylaş.</Text>
       </Pressable>
 
       {/* Linked teachers */}

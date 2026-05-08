@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert, ScrollView, Linking } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Button, Loading } from '@/components';
 import { getOfferings, purchasePackage, restorePurchases } from '@/lib/purchases';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/store/alert';
+import { getAccessTier } from '@/lib/access-tier';
 import { theme } from '@/theme';
 
 const STUDENT_FEATURES = [
@@ -36,6 +38,15 @@ export default function PaywallScreen() {
 
   const isTeacher = profile?.role === 'teacher';
   const features = isTeacher ? TEACHER_FEATURES : STUDENT_FEATURES;
+  const tier = getAccessTier(profile);
+  const isPro = tier === 'subscribed';
+
+  // If already subscribed, bounce out — don't show the paywall.
+  useEffect(() => {
+    if (isPro) {
+      router.replace(profile?.role === 'teacher' ? '/teacher' : '/(tabs)');
+    }
+  }, [isPro, profile?.role]);
 
   useEffect(() => {
     (async () => {
@@ -60,10 +71,11 @@ export default function PaywallScreen() {
     try {
       await purchasePackage(pkg);
       await refreshProfile();
-      Alert.alert('Teşekkürler!', 'Pro üyeliğin başladı.');
-      router.back();
+      showAlert('Teşekkürler!', 'Pro üyeliğin başladı. İyi keşifler!', [
+        { text: 'Tamam', onPress: () => router.replace(isTeacher ? '/teacher' : '/(tabs)') },
+      ]);
     } catch (e: any) {
-      if (!e?.userCancelled) Alert.alert('Hata', e?.message ?? 'Satın alma başarısız');
+      if (!e?.userCancelled) showAlert('Hata', e?.message ?? 'Satın alma başarısız');
     } finally {
       setLoading(false);
     }
@@ -74,9 +86,9 @@ export default function PaywallScreen() {
     try {
       await restorePurchases();
       await refreshProfile();
-      Alert.alert('Tamamlandı', 'Satın almalar geri yüklendi.');
+      showAlert('Tamamlandı', 'Satın almalar geri yüklendi.');
     } catch (e: any) {
-      Alert.alert('Hata', e?.message ?? 'Geri yükleme başarısız');
+      showAlert('Hata', e?.message ?? 'Geri yükleme başarısız');
     } finally {
       setLoading(false);
     }
