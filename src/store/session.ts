@@ -8,6 +8,11 @@
  */
 import { create } from 'zustand';
 import { generateSession, type SessionOptions, type Question } from '@/domain';
+import {
+  ADAPTIVE_DEFAULTS,
+  nextAdaptiveState,
+  type AdaptiveState,
+} from '@/domain/adaptive';
 import { supabase } from '@/lib/supabase';
 import { getAccessTier, canPlayModule, maxWordsForTier } from '@/lib/access-tier';
 import { useAuth } from './auth';
@@ -41,6 +46,8 @@ interface SessionState {
   errorMessage:  string | null;
   xpEarned:      number;
   extra:         SessionExtra;
+  /** Live adaptive state for the current run; persisted on finish. */
+  adaptive:      AdaptiveState;
 
   start:    (moduleId: string, opts?: SessionOptions & SessionExtra) => Promise<void>;
   answer:   (chosen: string) => void;
@@ -73,8 +80,26 @@ export const useSession = create<SessionState>((set, get) => ({
   errorMessage: null,
   xpEarned: 0,
   extra: {},
+  adaptive: { ...ADAPTIVE_DEFAULTS },
 
   start: async (moduleId, opts = {}) => {
+    // Resume adaptive level from student_character if present, else start at 1.
+    let resumedAdaptive: AdaptiveState = { ...ADAPTIVE_DEFAULTS };
+    try {
+      const profile = useAuth.getState().profile;
+      if (profile) {
+        const { data } = await supabase
+          .from('student_character')
+          .select('adaptive_levels')
+          .eq('student_id', profile.id)
+          .maybeSingle();
+        const map = (data?.adaptive_levels ?? {}) as Record<string, number>;
+        if (typeof map[moduleId] === 'number') {
+          resumedAdaptive = { ...ADAPTIVE_DEFAULTS, currentLevel: map[moduleId] };
+        }
+      }
+    } catch { /* non-fatal */ }
+
     set({
       status: 'loading',
       moduleId,
@@ -86,6 +111,7 @@ export const useSession = create<SessionState>((set, get) => ({
       errorMessage: null,
       xpEarned: 0,
       extra: { assignmentId: opts.assignmentId },
+      adaptive: resumedAdaptive,
     });
 
     try {
@@ -125,7 +151,7 @@ export const useSession = create<SessionState>((set, get) => ({
   },
 
   answer: (chosen) => {
-    const { questions, index, status, questionShownAt, answers } = get();
+    const { questions, index, status, questionShownAt, answers, adaptive, xpEarned } = get();
     if (status !== 'ready') return;
     const q = questions[index];
     if (!q) return;
@@ -139,11 +165,14 @@ export const useSession = create<SessionState>((set, get) => ({
       wasCorrect: correct,
       msToAnswer: Date.now() - questionShownAt,
     };
+    const step = nextAdaptiveState(adaptive, correct);
     set({
       status: 'revealed',
       lastVerdict: verdict,
       lastChosen: chosen,
       answers: [...answers, log],
+      adaptive: step.state,
+      xpEarned: xpEarned + step.xpGained,
     });
   },
 
@@ -164,7 +193,7 @@ export const useSession = create<SessionState>((set, get) => ({
   },
 
   finish: async () => {
-    const { moduleId, questions, answers, startedAt, extra } = get();
+    const { moduleId, questions, answers, startedAt, extra, adaptive, xpEarned: liveXp } = get();
     if (!moduleId) return;
     const profile = useAuth.getState().profile;
     if (!profile) return;
@@ -173,7 +202,8 @@ export const useSession = create<SessionState>((set, get) => ({
     const correctCnt  = answers.filter((a) => a.wasCorrect).length;
     const isPerfect   = correctCnt === total;
     const durationS   = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
-    const xp          = correctCnt * XP_PER_CORRECT
+    // XP = per-question adaptive rewards already accumulated + completion + perfect bonus.
+    const xp          = liveXp
                         + XP_SESSION_COMPLETE
                         + (isPerfect ? XP_PERFECT_BONUS : 0);
     const wordIds: string[] = answers
@@ -210,12 +240,46 @@ export const useSession = create<SessionState>((set, get) => ({
     const { error: streakErr } = await supabase.rpc('update_streak');
     if (streakErr) console.warn('[session] update_streak failed', streakErr.message);
 
+    // Persist the per-module adaptive level for next session resume.
+    try {
+      const { data: charRow } = await supabase
+        .from('student_character')
+        .select('adaptive_levels')
+        .eq('student_id', profile.id)
+        .maybeSingle();
+      const map = ((charRow?.adaptive_levels as Record<string, number> | null) ?? {});
+      map[moduleId] = adaptive.currentLevel;
+      await supabase
+        .from('student_character')
+        .update({ adaptive_levels: map } as any)
+        .eq('student_id', profile.id);
+    } catch (e) {
+      console.warn('[session] adaptive persist failed', e);
+    }
+
     if (extra.assignmentId) {
-      await supabase.from('assignments').update({
+      const { data: updated } = await supabase.from('assignments').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
         session_id: sessionId,
-      }).eq('id', extra.assignmentId);
+      }).eq('id', extra.assignmentId).select('teacher_id, title').maybeSingle();
+
+      // Notify teacher that the student completed the homework.
+      if (updated?.teacher_id) {
+        await supabase.from('notifications').insert({
+          user_id: updated.teacher_id,
+          type:    'assignment_completed',
+          title:   'Ödev Tamamlandı',
+          body:    `${profile.full_name ?? 'Öğrenci'} "${updated.title}" ödevini bitirdi (${correctCnt}/${total} doğru).`,
+          payload: {
+            assignment_id: extra.assignmentId,
+            student_id:    profile.id,
+            session_id:    sessionId,
+            correct:       correctCnt,
+            total,
+          },
+        });
+      }
     }
 
     set({ xpEarned: xp });
@@ -224,7 +288,7 @@ export const useSession = create<SessionState>((set, get) => ({
   reset: () => set({
     status: 'idle', moduleId: null, questions: [], index: 0, answers: [],
     lastVerdict: null, lastChosen: null, startedAt: 0, questionShownAt: 0,
-    errorMessage: null, xpEarned: 0, extra: {},
+    errorMessage: null, xpEarned: 0, extra: {}, adaptive: { ...ADAPTIVE_DEFAULTS },
   }),
 }));
 

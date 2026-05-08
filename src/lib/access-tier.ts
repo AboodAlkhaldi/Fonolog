@@ -1,21 +1,21 @@
 /**
- * Tier / access helpers — one place for freemium logic.
+ * Tier / access helpers — single source of truth for game-access freemium logic.
  *
- * Tiers (descending power):
- *   admin                           → unlimited everything (preview also unlocks all)
- *   subscribed (active/student/expert) → all 24 modules, all words, all categories
- *   trial (within 7 days)          → like subscribed
- *   free (no sub, no trial)        → 5 modules, 8 words/cat, all categories visible
- *                                     but premium ones locked at module level
+ * Tiers:
+ *   admin                                      → unlimited everything
+ *   subscribed (active/student/expert)         → all 24 modules, all words
+ *   trial (within 7 days, status='trial')      → level 0+1, no pronunciation games
+ *   free (expired trial / no sub)              → level 0 only, no pronunciation games
+ *
+ * Quotas for non-game features (PDFs, assignments, students, reports) are
+ * tracked in src/lib/entitlements.ts + the feature_usage table.
  */
 import type { Profile, ModuleDefinition } from '@/domain';
+import { getModule } from '@/domain';
 
 export type AccessTier = 'admin' | 'subscribed' | 'trial' | 'free';
 
-export const FREE_MODULE_IDS = new Set([
-  'tani', 'tamamla', 'kategori', 'uyak', 'heceBirlestir',
-]);
-
+/** Words shown per category for users who can't see them all (free tier). */
 export const FREE_WORDS_PER_CATEGORY = 8;
 
 /**
@@ -31,7 +31,6 @@ export function setAdminPreviewTier(tier: AccessTier | null): void {
 export function getAccessTier(profile: Profile | null | undefined): AccessTier {
   if (!profile) return 'free';
 
-  // Admin override (when admin previews student/teacher view)
   if (adminPreviewOverride !== null) return adminPreviewOverride;
 
   if (profile.role === 'admin') return 'admin';
@@ -50,13 +49,30 @@ export function getAccessTier(profile: Profile | null | undefined): AccessTier {
   return 'free';
 }
 
-/** Can this tier launch this module? */
-export function canPlayModule(tier: AccessTier, moduleId: string): boolean {
-  if (tier === 'admin' || tier === 'subscribed' || tier === 'trial') return true;
-  return FREE_MODULE_IDS.has(moduleId);
+/** free tier: level 0 only, no pronunciation. */
+function isOpenForFreeTier(def: ModuleDefinition): boolean {
+  return def.level === 0 && !def.usesPronunciation;
 }
 
-/** How many words from a category should the user see in a session? */
+/** trial tier: level 0+1, no pronunciation. */
+function isOpenForTrialTier(def: ModuleDefinition): boolean {
+  return (def.level === 0 || def.level === 1) && !def.usesPronunciation;
+}
+
+/** Can this tier launch this module? Accepts module ID or full definition. */
+export function canPlayModule(tier: AccessTier, moduleIdOrDef: string | ModuleDefinition): boolean {
+  if (tier === 'admin' || tier === 'subscribed') return true;
+
+  const def = typeof moduleIdOrDef === 'string'
+    ? getModule(moduleIdOrDef)
+    : moduleIdOrDef;
+  if (!def) return false;
+
+  if (tier === 'trial') return isOpenForTrialTier(def);
+  return isOpenForFreeTier(def);
+}
+
+/** How many words from a category should the user see in a session? null = unlimited. */
 export function maxWordsForTier(tier: AccessTier): number | null {
   if (tier === 'admin' || tier === 'subscribed' || tier === 'trial') return null;
   return FREE_WORDS_PER_CATEGORY;
@@ -64,7 +80,7 @@ export function maxWordsForTier(tier: AccessTier): number | null {
 
 /** Does this user need to see the paywall on a tap? */
 export function shouldShowPaywall(tier: AccessTier): boolean {
-  return tier === 'free';
+  return tier === 'free' || tier === 'trial';
 }
 
 /** Trial banner data, or null if not in trial. */
@@ -77,8 +93,38 @@ export function trialDaysRemaining(profile: Profile | null | undefined): number 
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
 }
 
-/** Filter modules a user can see. Free users still see all but get locked badges. */
+/**
+ * Plan-lock: module is off-limits due to subscription tier.
+ * Used for paywall redirect.
+ */
 export function isModuleLocked(tier: AccessTier, moduleDef: ModuleDefinition): boolean {
-  if (tier === 'admin' || tier === 'subscribed' || tier === 'trial') return false;
-  return !FREE_MODULE_IDS.has(moduleDef.id);
+  if (tier === 'admin' || tier === 'subscribed') return false;
+  if (tier === 'trial') return !isOpenForTrialTier(moduleDef);
+  return !isOpenForFreeTier(moduleDef);
+}
+
+/**
+ * Level-lock: subscribed/admin user hasn't reached the module's level yet.
+ * Only applies to paid users — free/trial users see plan-lock instead.
+ * Returns true when the student needs to progress further before unlocking.
+ */
+export function isModuleLevelLocked(
+  tier: AccessTier,
+  moduleDef: ModuleDefinition,
+  studentLevel: number,
+): boolean {
+  if (tier !== 'subscribed' && tier !== 'admin') return false;
+  return moduleDef.level > studentLevel;
+}
+
+/** Map subscription_status to a Turkish display label. */
+export function subscriptionLabel(status: string | null | undefined): string {
+  const map: Record<string, string> = {
+    trial:   'Pro Deneme',
+    active:  'Pro Aktif',
+    student: 'Öğrenci Pro',
+    expert:  'Uzman Pro',
+    free:    'Ücretsiz',
+  };
+  return map[status ?? ''] ?? (status ?? 'Ücretsiz');
 }

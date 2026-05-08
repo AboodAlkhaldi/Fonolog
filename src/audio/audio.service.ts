@@ -17,6 +17,9 @@ import {
   RecordingPresets,
 } from 'expo-audio';
 
+export { createAudioPlayer };
+export type { AudioPlayer };
+
 let currentPlayer: AudioPlayer | null = null;
 
 /** Initialize audio mode once at app startup. */
@@ -51,6 +54,22 @@ export async function playWordAudio(audioUrl: string | null | undefined): Promis
     player.play();
   } catch (e) {
     console.warn('[audio] play failed', e);
+  }
+}
+
+/**
+ * Play an already-created (preloaded) player.
+ * Stops whatever is currently playing first, then starts the supplied player
+ * from the beginning. Used by SpeakerButton for near-instant playback.
+ */
+export async function playPreloaded(player: AudioPlayer): Promise<void> {
+  await stopAll();
+  try {
+    player.seekTo(0);
+    player.play();
+    currentPlayer = player;
+  } catch (e) {
+    console.warn('[audio] playPreloaded failed', e);
   }
 }
 

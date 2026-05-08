@@ -35,10 +35,11 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     science:         'Sözcük dağarcığı ve görsel temsil gücü, okuma anlama becerisinin temel bileşenleridir. Görseli sesle eşleştirme, semantik hafızayı pekiştirir. (Wolf & Bowers, 1999)',
     familyTip:       'Günlük nesneleri çocuğunuzla birlikte adlandırın. "Bu ne?" diye sorarak çocuğunuzun kelime hazinesini zenginleştirin.',
     color:           '#F5A623',
-    level:           0,
+    level:           1,
     screenType:      'explore',
     generator:       genKesfet,
-    requiresPremium: false,
+    requiresPremium: true,
+    usesPronunciation: true,
   },
   {
     id:              'tani',
@@ -75,7 +76,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     science:         'Harf-ses bilgisi, alfabetik prensip için zorunludur. Başlangıç sesinin tanınması, fonetik kodlamanın ilk aşamasıdır. (Lundberg ve ark., 1988)',
     familyTip:       'Sokakta gördüğünüz tabelaların, ürün isimlerinin ilk harflerini birlikte bulun.',
     color:           '#FF7043',
-    level:           1,
+    level:           0,
     screenType:      'quiz',
     generator:       genHarf,
     requiresPremium: false,
@@ -171,6 +172,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     screenType:      'memory',
     generator:       genKelimeDizisi,
     requiresPremium: true,
+    usesPronunciation: true,
   },
   {
     id:              'siraliHatirla',
@@ -184,6 +186,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     screenType:      'memory',
     generator:       genSiraliHatirla,
     requiresPremium: true,
+    usesPronunciation: true,
   },
   // ── LEVEL 3: FONEM ─────────────────────────────────────────────
   {
@@ -289,6 +292,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     screenType:      'phoneme',
     generator:       genFonemSilme,
     requiresPremium: true,
+    usesPronunciation: true,
   },
   {
     id:              'ilkHeceSilme',
@@ -302,6 +306,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     screenType:      'phoneme',
     generator:       genIlkHeceSilme,
     requiresPremium: true,
+    usesPronunciation: true,
   },
   {
     id:              'sonHeceSilme',
@@ -315,8 +320,9 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     screenType:      'phoneme',
     generator:       genSonHeceSilme,
     requiresPremium: true,
+    usesPronunciation: true,
   },
-  // ── LEVEL 5: AKICILIK ──────────────────────────────────────────
+  // ── LEVEL 4: AKICILIK ──────────────────────────────────────────
   {
     id:              'ran',
     icon:            '⚡',
@@ -325,10 +331,11 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     science:         'Hızlı otomatik adlandırma (RAN), okuma akıcılığı bozukluklarını tahmin eden en güçlü değişkenlerden biridir. Disleksi değerlendirmelerinde kritik bir tanı aracı olarak kullanılır. (Wolf & Bowers, 1999)',
     familyTip:       'Resimli bir kitabın sayfasındaki nesneleri mümkün olduğunca hızlı adlandırmasını isteyin. Çocuğunuzla yarışın; kazanmasına izin verin!',
     color:           '#DC2626',
-    level:           5,
+    level:           4,
     screenType:      'quiz',
     generator:       genRan,
     requiresPremium: true,
+    usesPronunciation: true,
     isNew:           false,
   },
 ]

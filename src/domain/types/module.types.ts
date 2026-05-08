@@ -25,5 +25,7 @@ export interface ModuleDefinition {
   screenType:      ScreenType
   generator:       (words: Word[]) => Question[]
   requiresPremium: boolean
+  /** Modules that need TTS / mic / pronunciation grading. Always blocked in trial. */
+  usesPronunciation?: boolean
   isNew?:          boolean
 }

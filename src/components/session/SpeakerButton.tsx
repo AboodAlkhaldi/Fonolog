@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-import { playWordAudio } from '@/audio/audio.service';
+import { createAudioPlayer, playPreloaded, AudioPlayer } from '@/audio/audio.service';
 import { theme, MIN_TOUCH_TARGET } from '@/theme';
 
 interface Props {
@@ -12,19 +12,36 @@ interface Props {
   style?:   ViewStyle;
 }
 
-/** Tap to play a word's TTS. Disabled with muted color when no URL. */
+/** Tap to play a word's TTS. Preloads audio when the URL is known to eliminate buffering delay. */
 export function SpeakerButton({ audioUrl, size = MIN_TOUCH_TARGET, style }: Props) {
   const [playing, setPlaying] = useState(false);
+  const playerRef = useRef<AudioPlayer | null>(null);
   const enabled = !!audioUrl;
+
+  // Preload: create the player as soon as we have a URL so it buffers in the background.
+  useEffect(() => {
+    if (!audioUrl) {
+      playerRef.current?.remove();
+      playerRef.current = null;
+      return;
+    }
+    const p = createAudioPlayer({ uri: audioUrl });
+    playerRef.current = p;
+    return () => {
+      p.remove();
+      playerRef.current = null;
+    };
+  }, [audioUrl]);
 
   const onPress = async () => {
     if (!enabled || playing) return;
     Haptics.selectionAsync().catch(() => {});
     setPlaying(true);
     try {
-      await playWordAudio(audioUrl);
+      if (playerRef.current) {
+        await playPreloaded(playerRef.current);
+      }
     } finally {
-      // expo-audio doesn't reliably fire onEnd synchronously; gate via timeout
       setTimeout(() => setPlaying(false), 1500);
     }
   };

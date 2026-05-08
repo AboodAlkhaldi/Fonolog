@@ -160,6 +160,16 @@ const tr = {
     quit:         'Çık',
     quitConfirm:  'Oturumdan çıkmak istediğine emin misin? İlerlemen kaydedilmeyecek.',
   },
+  results: {
+    title:       'Tebrikler!',
+    perfect:     'Mükemmel! Hepsi doğru! 🌟',
+    great:       'Harika gidiyor! 🎉',
+    keepGoing:   'Devam et, daha iyisini yapacaksın! 💪',
+    score:       'Puan',
+    duration:    '{{seconds}}s',
+    playAgain:   'Tekrar Oyna',
+    backToLearn: 'Öğrenmeye Dön',
+  },
   profile: {
     title:        'Profil',
     accountInfo:  'Hesap Bilgileri',
