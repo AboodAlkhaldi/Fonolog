@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Button, Input, Loading } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { contentRepository, type Category } from '@/domain';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 /**
  * Auto-syllabify a Turkish word — quick rule-based fallback for admins
@@ -70,7 +72,7 @@ export default function WordEditScreen() {
 
   const onSubmit = async () => {
     if (!wordText || !emoji || !categoryId) {
-      Alert.alert('Eksik', 'Tüm alanları doldur.');
+      showAlert(t('teacher.assignment.incompleteTitle'), t('teacher.wordEdit.incompleteMsg'));
       return;
     }
     setSubmitting(true);
@@ -97,7 +99,7 @@ export default function WordEditScreen() {
     }
 
     if (result.error) {
-      Alert.alert('Hata', result.error.message);
+      showAlert(t('app.error_title'), result.error.message);
       setSubmitting(false);
       return;
     }
@@ -126,22 +128,22 @@ export default function WordEditScreen() {
       <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
         <Ionicons name="chevron-back" size={28} color={theme.colors.text.primary} />
       </Pressable>
-      <Text style={styles.title}>{isNew ? 'Yeni Kelime' : 'Kelime Düzenle'}</Text>
+      <Text style={styles.title}>{isNew ? t('teacher.wordEdit.titleNew') : t('teacher.wordEdit.titleEdit')}</Text>
 
       <ScrollView>
-        <Input label="Kelime" value={wordText} onChangeText={setWordText} autoCapitalize="none" required />
-        <Input label="Emoji"  value={emoji}    onChangeText={setEmoji} required />
+        <Input label={t('teacher.wordEdit.wordLabel')} value={wordText} onChangeText={setWordText} autoCapitalize="none" required />
+        <Input label={t('teacher.wordEdit.emojiLabel')} value={emoji} onChangeText={setEmoji} required />
 
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
           <View style={{ flex: 1 }}>
-            <Input label="Heceler (- ile ayır)" value={syllables} onChangeText={setSyllables} autoCapitalize="none"
-                   helper="ör: ka-lem" />
+            <Input label={t('teacher.wordEdit.syllablesLabel')} value={syllables} onChangeText={setSyllables} autoCapitalize="none"
+                   helper={t('teacher.wordEdit.syllablesHelper')} />
           </View>
-          <Button label="Otomatik" variant="ghost" size="md" onPress={onAutoSyllable}
+          <Button label={t('teacher.wordEdit.autoBtn')} variant="ghost" size="md" onPress={onAutoSyllable}
                   style={{ marginBottom: 16 }} />
         </View>
 
-        <Text style={styles.label}>Kategori</Text>
+        <Text style={styles.label}>{t('teacher.wordEdit.categoryLabel')}</Text>
         <View style={styles.catGrid}>
           {cats.map((c) => (
             <Pressable
@@ -156,7 +158,7 @@ export default function WordEditScreen() {
         </View>
 
         <Button
-          label={isNew ? 'Ekle' : 'Kaydet'}
+          label={isNew ? t('teacher.wordEdit.addBtn') : t('teacher.wordEdit.saveBtn')}
           variant="cta"
           size="lg"
           fullWidth

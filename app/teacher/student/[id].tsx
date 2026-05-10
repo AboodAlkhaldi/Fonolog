@@ -13,6 +13,7 @@ import { useAuth } from '@/store/auth';
 import { showAlert } from '@/store/alert';
 import { checkUsage, recordUsage } from '@/lib/entitlements';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 export default function TeacherStudentDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -56,16 +57,16 @@ export default function TeacherStudentDetail() {
 
   const onUnlink = () => {
     if (impersonating === 'teacher' || id === '__preview__') {
-      showAlert('Önizleme', 'Bu işlem önizleme modunda kullanılamaz.');
+      showAlert(t('profile.previewAction'), t('teacher.studentDetail.previewMsg'));
       return;
     }
-    showAlert('Öğrenciyi Sil', 'Bu öğrenciyi listenden çıkarmak istediğinden emin misin? (Öğrencinin hesabı silinmeyecek.)', [
-      { text: 'Vazgeç', style: 'cancel' },
+    showAlert(t('teacher.studentDetail.unlinkTitle'), t('teacher.studentDetail.unlinkMsg'), [
+      { text: t('app.cancel'), style: 'cancel' },
       {
-        text: 'Sil', style: 'destructive',
+        text: t('teacher.studentDetail.unlinkBtn'), style: 'destructive',
         onPress: async () => {
           const { error } = await supabase.rpc('unlink_student', { p_student_id: id });
-          if (error) { showAlert('Hata', error.message); return; }
+          if (error) { showAlert(t('app.error_title'), error.message); return; }
           router.back();
         },
       },
@@ -74,19 +75,19 @@ export default function TeacherStudentDetail() {
 
   const onSendNotification = () => {
     if (impersonating === 'teacher' || id === '__preview__') {
-      showAlert('Önizleme', 'Bu işlem önizleme modunda kullanılamaz.');
+      showAlert(t('profile.previewAction'), t('teacher.studentDetail.previewMsg'));
       return;
     }
-    if (templates.length === 0) { showAlert('Bilgi', 'Henüz bildirim şablonu yok.'); return; }
+    if (templates.length === 0) { showAlert(t('app.ok'), t('teacher.studentDetail.notifNoTemplates')); return; }
     showAlert(
-      'Bildirim Gönder',
-      'Bir şablon seç:',
+      t('teacher.studentDetail.notifTitle'),
+      t('teacher.studentDetail.notifMsg'),
       [
         ...templates.map((tpl) => ({
           text: tpl.title,
           onPress: () => sendNotif(tpl),
         })),
-        { text: 'Vazgeç', style: 'cancel' as const },
+        { text: t('app.cancel'), style: 'cancel' as const },
       ],
     );
   };
@@ -105,13 +106,13 @@ export default function TeacherStudentDetail() {
         body:    tpl.body,
       }),
     });
-    if (res.ok) showAlert('Gönderildi', 'Bildirim öğrenciye iletildi.');
-    else showAlert('Hata', await res.text());
+    if (res.ok) showAlert(t('teacher.studentDetail.notifSentTitle'), t('teacher.studentDetail.notifSentMsg'));
+    else showAlert(t('app.error_title'), await res.text());
   };
 
   const onAssignHomework = () => {
     if (impersonating === 'teacher' || id === '__preview__') {
-      showAlert('Önizleme', 'Ödev oluşturma yalnızca gerçek öğrenciler için kullanılabilir.');
+      showAlert(t('profile.previewAction'), t('teacher.studentDetail.assignPreview'));
       return;
     }
     router.push(`/teacher/assignments/new?studentId=${id}`);
@@ -119,7 +120,7 @@ export default function TeacherStudentDetail() {
 
   const onOpenNotes = () => {
     if (impersonating === 'teacher' || id === '__preview__') {
-      showAlert('Önizleme', 'PDF raporu yalnızca gerçek öğrenci profillerinde oluşturulabilir.');
+      showAlert(t('profile.previewAction'), t('teacher.studentDetail.pdfPreview'));
       return;
     }
     setNotesOpen(true);
@@ -130,11 +131,11 @@ export default function TeacherStudentDetail() {
     const usage = await checkUsage(teacherProfile, 'pdf_teacher');
     if (!usage.allowed) {
       showAlert(
-        'Kota Doldu',
-        'Bu hafta PDF rapor kotanı kullandın. Sınırsız rapor için Pro\'ya yükselt.',
+        t('teacher.studentDetail.pdfQuotaTitle'),
+        t('teacher.studentDetail.pdfQuotaMsg'),
         [
-          { text: 'Vazgeç', style: 'cancel' },
-          { text: 'Pro\'ya Geç', onPress: () => router.push('/paywall') },
+          { text: t('app.cancel'), style: 'cancel' },
+          { text: t('teacher.studentDetail.upgradeBtn'), onPress: () => router.push('/paywall') },
         ],
       );
       return;
@@ -153,7 +154,7 @@ export default function TeacherStudentDetail() {
           teacher_notes: teacherNotes || undefined,
         }),
       });
-      if (!res.ok) { showAlert('Hata', await res.text()); return; }
+      if (!res.ok) { showAlert(t('app.error_title'), await res.text()); return; }
       const { html } = await res.json();
 
       const { uri } = await Print.printToFileAsync({ html });
@@ -179,8 +180,8 @@ export default function TeacherStudentDetail() {
         await supabase.from('notifications').insert({
           user_id: id,
           type:    'teacher_note',
-          title:   'Yeni İlerleme Raporu',
-          body:    'Öğretmenin senin için bir PDF rapor hazırladı.',
+          title:   t('teacher.studentDetail.pdfNotifTitle'),
+          body:    t('teacher.studentDetail.pdfNotifBody'),
           payload: { report_url: publicUrl, teacher_id: teacherProfile?.id, has_notes: !!teacherNotes },
         });
       } else {
@@ -196,13 +197,13 @@ export default function TeacherStudentDetail() {
       setNotesOpen(false);
       setTeacherNotes('');
       showAlert(
-        'Rapor Oluşturuldu',
+        t('teacher.studentDetail.reportDoneTitle'),
         publicUrl
-          ? 'Rapor öğrenciye iletildi ve bildirim gönderildi.'
-          : 'Rapor oluşturuldu (paylaşıldı). Öğrenciye iletilemedi.',
+          ? t('teacher.studentDetail.reportDoneMsg')
+          : t('teacher.studentDetail.reportDoneMsgNoUpload'),
       );
     } catch (e) {
-      showAlert('Hata', 'PDF oluşturulurken hata: ' + (e instanceof Error ? e.message : String(e)));
+      showAlert(t('app.error_title'), 'PDF oluşturulurken hata: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
       setGenerating(false);
     }
@@ -216,7 +217,7 @@ export default function TeacherStudentDetail() {
         data={sessions}
         keyExtractor={(s) => s.id}
         contentContainerStyle={{ paddingBottom: theme.spacing[8] }}
-        ListEmptyComponent={<Text style={styles.empty}>Henüz oturum yok.</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>{t('teacher.studentDetail.noSessions')}</Text>}
         ListHeaderComponent={
           <View>
             <Pressable onPress={() => router.back()} style={styles.back} hitSlop={12}>
@@ -237,13 +238,13 @@ export default function TeacherStudentDetail() {
             </View>
 
             <View style={styles.actions}>
-              <ActionBtn icon="clipboard-outline"   label="Ödev Ver"        onPress={onAssignHomework} />
-              <ActionBtn icon="chatbubble-outline"  label="Bildirim Gönder" onPress={onSendNotification} />
-              <ActionBtn icon="document-outline"    label="PDF Rapor"       onPress={onOpenNotes} />
-              <ActionBtn icon="trash-outline"       label="Sil"             onPress={onUnlink} danger />
+              <ActionBtn icon="clipboard-outline"   label={t('teacher.studentDetail.actionAssign')}  onPress={onAssignHomework} />
+              <ActionBtn icon="chatbubble-outline"  label={t('teacher.studentDetail.actionNotify')}  onPress={onSendNotification} />
+              <ActionBtn icon="document-outline"    label={t('teacher.studentDetail.actionPdf')}     onPress={onOpenNotes} />
+              <ActionBtn icon="trash-outline"       label={t('teacher.studentDetail.actionDelete')}  onPress={onUnlink} danger />
             </View>
 
-            <Text style={styles.sectionTitle}>Son Oturumlar</Text>
+            <Text style={styles.sectionTitle}>{t('teacher.studentDetail.recentSessions')}</Text>
           </View>
         }
         renderItem={({ item }) => (
@@ -266,26 +267,24 @@ export default function TeacherStudentDetail() {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <ScrollView keyboardShouldPersistTaps="handled">
-              <Text style={styles.modalTitle}>Öğretmen Notları</Text>
-              <Text style={styles.modalSubtitle}>
-                Bu notlar yalnızca PDF raporda görünür ve aileyle paylaşılır.
-              </Text>
+              <Text style={styles.modalTitle}>{t('teacher.studentDetail.notesTitle')}</Text>
+              <Text style={styles.modalSubtitle}>{t('teacher.studentDetail.notesSubtitle')}</Text>
               <Input
                 value={teacherNotes}
                 onChangeText={setTeacherNotes}
-                placeholder="Çocuğun gelişimi hakkında özel notlar..."
+                placeholder={t('teacher.studentDetail.notesPlaceholder')}
                 multiline
                 numberOfLines={6}
               />
               <Button
-                label="Raporu Oluştur ve Gönder"
+                label={t('teacher.studentDetail.notesSubmit')}
                 variant="cta" size="lg" fullWidth
                 loading={generating}
                 onPress={onGenerateReport}
                 style={{ marginTop: theme.spacing[3] }}
               />
               <Button
-                label="Vazgeç"
+                label={t('app.cancel')}
                 variant="ghost" size="md" fullWidth
                 onPress={() => !generating && setNotesOpen(false)}
                 style={{ marginTop: theme.spacing[2] }}

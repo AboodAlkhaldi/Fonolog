@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Loading, Button, Input } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { contentRepository } from '@/domain';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 interface WordRow {
   id: string;
@@ -40,15 +42,15 @@ export default function WordsScreen() {
   const generateMissingAudio = async () => {
     const missing = words.filter((w) => !w.audio_url);
     if (missing.length === 0) {
-      Alert.alert('Tamam', 'Tüm kelimelerin sesi mevcut.');
+      showAlert(t('teacher.words.allAudioOkTitle'), t('teacher.words.allAudioOkMsg'));
       return;
     }
-    Alert.alert(
-      'Eksik sesleri üret',
-      `${missing.length} kelime için TTS oluşturulacak. Devam et?`,
+    showAlert(
+      t('teacher.words.genTitle'),
+      t('teacher.words.genMsg', { count: missing.length }),
       [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: 'Devam', onPress: () => runBulkTTS(missing) },
+        { text: t('app.cancel'), style: 'cancel' },
+        { text: t('teacher.words.genProceedBtn'), onPress: () => runBulkTTS(missing) },
       ],
     );
   };
@@ -74,7 +76,7 @@ export default function WordsScreen() {
     }
     contentRepository.invalidate();
     await load();
-    Alert.alert('Bitti', `Başarılı: ${ok}, başarısız: ${fail}`);
+    showAlert(t('teacher.words.genDoneTitle'), t('teacher.words.genDoneMsg', { ok, fail }));
   };
 
   if (loading) return <Screen><Loading /></Screen>;
@@ -84,23 +86,23 @@ export default function WordsScreen() {
       <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
         <Ionicons name="chevron-back" size={28} color={theme.colors.text.primary} />
       </Pressable>
-      <Text style={styles.title}>Kelimeler ({words.length})</Text>
+      <Text style={styles.title}>{t('teacher.words.title', { count: words.length })}</Text>
 
       <Input
         value={search}
         onChangeText={setSearch}
-        placeholder="Kelime ara..."
+        placeholder={t('teacher.words.searchPh')}
       />
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Button
-          label="+ Yeni Kelime"
+          label={t('teacher.words.newWordBtn')}
           variant="primary"
           size="md"
           onPress={() => router.push('/teacher/word/new' as any)}
           style={{ flex: 1 }}
         />
         <Button
-          label="Eksik sesleri üret"
+          label={t('teacher.words.genMissingBtn')}
           variant="secondary"
           size="md"
           onPress={generateMissingAudio}

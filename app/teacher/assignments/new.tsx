@@ -11,6 +11,7 @@ import { contentRepository, listModules } from '@/domain';
 import { checkUsage, recordUsage } from '@/lib/entitlements';
 import { getAccessTier, canPlayModule } from '@/lib/access-tier';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 export default function NewAssignment() {
   const teacher = useAuth((s) => s.user);
@@ -75,11 +76,11 @@ export default function NewAssignment() {
   const submit = async () => {
     if (!teacher) return;
     if (impersonating === 'teacher') {
-      showAlert('Önizleme', 'Önizleme modunda ödev oluşturulamaz.');
+      showAlert(t('profile.previewAction'), t('teacher.assignment.previewMsg'));
       return;
     }
     if (!studentId || pickedWords.size === 0 || pickedModules.size === 0 || !title) {
-      showAlert('Eksik', 'Tüm adımları tamamla.');
+      showAlert(t('teacher.assignment.incompleteTitle'), t('teacher.assignment.incompleteMsg'));
       return;
     }
 
@@ -87,11 +88,11 @@ export default function NewAssignment() {
     const usage = await checkUsage(profile, 'assignment_create');
     if (!usage.allowed) {
       showAlert(
-        'Kota Doldu',
-        `${usage.reason} Sınırsız ödev için Pro'ya yükselt.`,
+        t('teacher.assignment.quotaTitle'),
+        `${usage.reason} ${t('teacher.assignment.quotaSuffix')}`,
         [
-          { text: 'Vazgeç', style: 'cancel' },
-          { text: 'Pro\'ya Geç', onPress: () => router.push('/paywall') },
+          { text: t('app.cancel'), style: 'cancel' },
+          { text: t('teacher.assignment.upgradeBtn'), onPress: () => router.push('/paywall') },
         ],
       );
       return;
@@ -115,7 +116,7 @@ export default function NewAssignment() {
 
     if (error) {
       setSubmitting(false);
-      showAlert('Hata', error.message);
+      showAlert(t('app.error_title'), error.message);
       return;
     }
 
@@ -123,7 +124,7 @@ export default function NewAssignment() {
     await supabase.from('notifications').insert({
       user_id: studentId,
       type:    'assignment_new',
-      title:   'Yeni Ödev',
+      title:   t('teacher.assignment.notifTitle'),
       body:    title,
       payload: { assignment_id: assignment?.id, teacher_id: teacher.id, message },
     });
@@ -131,8 +132,8 @@ export default function NewAssignment() {
     await recordUsage(profile, 'assignment_create');
 
     setSubmitting(false);
-    showAlert('Başarılı', 'Ödev oluşturuldu ve öğrenciye bildirildi.', [
-      { text: 'Tamam', onPress: () => router.back() },
+    showAlert(t('teacher.assignment.successTitle'), t('teacher.assignment.successMsg'), [
+      { text: t('app.ok'), onPress: () => router.back() },
     ]);
   };
 
@@ -141,7 +142,7 @@ export default function NewAssignment() {
       <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
         <Ionicons name="chevron-back" size={28} color={theme.colors.text.primary} />
       </Pressable>
-      <Text style={styles.title}>Yeni Ödev</Text>
+      <Text style={styles.title}>{t('teacher.assignment.title')}</Text>
 
       {/* Step nav */}
       <View style={styles.steps}>
@@ -159,8 +160,8 @@ export default function NewAssignment() {
           ListEmptyComponent={
             <Text style={styles.empty}>
               {impersonating === 'teacher'
-                ? 'Önizleme modunda öğrenci listesi gösterilmez.'
-                : 'Henüz bağlı öğrenci yok.'}
+                ? t('teacher.assignment.previewNoStudents')
+                : t('teacher.assignment.noStudents')}
             </Text>
           }
           renderItem={({ item }) => (
@@ -177,7 +178,7 @@ export default function NewAssignment() {
 
       {step === 'words' && (
         <View style={{ flex: 1 }}>
-          <Text style={styles.hint}>Kelimeler ({pickedWords.size} seçildi)</Text>
+          <Text style={styles.hint}>{t('teacher.assignment.wordsHint', { count: pickedWords.size })}</Text>
           <FlatList
             style={{ flex: 1 }}
             data={allWords}
@@ -201,13 +202,13 @@ export default function NewAssignment() {
               );
             }}
           />
-          <Button label="Devam" variant="cta" size="md" onPress={() => setStep('modules')} disabled={pickedWords.size === 0} />
+          <Button label={t('teacher.assignment.continueBtn')} variant="cta" size="md" onPress={() => setStep('modules')} disabled={pickedWords.size === 0} />
         </View>
       )}
 
       {step === 'modules' && (
         <View style={{ flex: 1 }}>
-          <Text style={styles.hint}>Oyunlar ({pickedModules.size} seçildi) · Öğrenci planına göre filtrelendi</Text>
+          <Text style={styles.hint}>{t('teacher.assignment.modulesHint', { count: pickedModules.size })}</Text>
           <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={{ paddingBottom: theme.spacing[3] }}
@@ -216,14 +217,14 @@ export default function NewAssignment() {
               const accessible = canPlayModule(studentAccessTier, m);
               const selected   = pickedModules.has(m.id);
               const lockReason = !accessible
-                ? (m.usesPronunciation ? 'Telaffuz — Pro gerektirir' : `Seviye ${m.level} — planında yok`)
+                ? (m.usesPronunciation ? t('teacher.assignment.lockPronunciation') : t('teacher.assignment.lockLevel', { level: m.level }))
                 : null;
               return (
                 <Pressable
                   key={m.id}
                   onPress={() => {
                     if (!accessible) {
-                      showAlert('Kilitli', `Bu oyun öğrencinin planında açık değil: ${lockReason}`);
+                      showAlert(t('teacher.assignment.lockTitle'), t('teacher.assignment.lockMsg', { reason: lockReason }));
                       return;
                     }
                     const next = new Set(pickedModules);
@@ -247,7 +248,7 @@ export default function NewAssignment() {
               );
             })}
           </ScrollView>
-          <Button label="Devam" variant="cta" size="md" onPress={() => setStep('meta')} disabled={pickedModules.size === 0} />
+          <Button label={t('teacher.assignment.continueBtn')} variant="cta" size="md" onPress={() => setStep('meta')} disabled={pickedModules.size === 0} />
         </View>
       )}
 
@@ -257,17 +258,17 @@ export default function NewAssignment() {
           contentContainerStyle={{ paddingBottom: theme.spacing[6] }}
           keyboardShouldPersistTaps="handled"
         >
-          <Input label="Başlık" value={title} onChangeText={setTitle} required />
+          <Input label={t('teacher.assignment.titleLabel')} value={title} onChangeText={setTitle} required />
           <Input
-            label="Mesaj (öğrenciye not)"
+            label={t('teacher.assignment.messageLabel')}
             value={message}
             onChangeText={setMessage}
-            placeholder="Bu ödevi neden verdiğini ya da ipuçlarını yaz..."
+            placeholder={t('teacher.assignment.messagePh')}
             multiline
             numberOfLines={4}
           />
           <Button
-            label="Ödevi Oluştur"
+            label={t('teacher.assignment.submitBtn')}
             variant="cta"
             size="lg"
             fullWidth

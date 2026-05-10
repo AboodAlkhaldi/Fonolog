@@ -7,6 +7,7 @@ import { Screen, Input, Button } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 export default function InviteStudent() {
   const [email, setEmail] = useState('');
@@ -21,11 +22,11 @@ export default function InviteStudent() {
     if (canLink === false) {
       setSubmitting(false);
       showAlert(
-        'Sınıra Ulaşıldı',
-        'Deneme sürecinde sadece 1 öğrenci ekleyebilirsin. Sınırsız öğrenci için Pro\'ya yükselt.',
+        t('teacher.invite.limitTitle'),
+        t('teacher.invite.limitMsg'),
         [
-          { text: 'Vazgeç', style: 'cancel' },
-          { text: 'Pro\'ya Geç', onPress: () => router.push('/paywall') },
+          { text: t('app.cancel'), style: 'cancel' },
+          { text: t('teacher.invite.upgradeBtn'), onPress: () => router.push('/paywall') },
         ],
       );
       return;
@@ -34,14 +35,14 @@ export default function InviteStudent() {
     const { data, error } = await supabase.rpc('invite_student', { p_email: email.trim().toLowerCase() });
     setSubmitting(false);
 
-    if (error) { showAlert('Hata', error.message); return; }
+    if (error) { showAlert(t('app.error_title'), error.message); return; }
     const row = Array.isArray(data) ? data[0] : data;
     if (row?.status === 'accepted') {
-      showAlert('Başarılı', row.message ?? 'Öğrenci eklendi.', [
-        { text: 'Tamam', onPress: () => router.back() },
+      showAlert(t('app.ok'), row.message ?? t('teacher.invite.successMsg'), [
+        { text: t('app.ok'), onPress: () => router.back() },
       ]);
     } else {
-      showAlert('Eklenemedi', row?.message ?? 'Beklenmeyen hata.');
+      showAlert(t('app.error_title'), row?.message ?? t('app.error'));
     }
   };
 
@@ -51,14 +52,11 @@ export default function InviteStudent() {
         <Ionicons name="chevron-back" size={28} color={theme.colors.text.primary} />
       </Pressable>
 
-      <Text style={styles.title}>Öğrenci Ekle</Text>
-      <Text style={styles.subtitle}>
-        Öğrencinin uygulamada kayıtlı olduğu e-posta adresini gir. Henüz kayıtlı değilse,
-        önce kendisinin uygulamaya kayıt olması gerekir.
-      </Text>
+      <Text style={styles.title}>{t('teacher.invite.title')}</Text>
+      <Text style={styles.subtitle}>{t('teacher.invite.description')}</Text>
 
       <Input
-        label="Öğrenci e-posta"
+        label={t('teacher.invite.emailLabel')}
         value={email}
         onChangeText={setEmail}
         placeholder="ornek@email.com"
@@ -69,13 +67,11 @@ export default function InviteStudent() {
 
       <View style={styles.note}>
         <Ionicons name="information-circle-outline" size={18} color={theme.colors.feedback.infoText} />
-        <Text style={styles.noteText}>
-          Deneme sürecinde sadece 1 öğrenci ekleyebilirsin. Aboneliğe geçince sınır yok.
-        </Text>
+        <Text style={styles.noteText}>{t('teacher.invite.trialNote')}</Text>
       </View>
 
       <Button
-        label="Öğrenciyi Ekle"
+        label={t('teacher.invite.addBtn')}
         variant="cta"
         size="lg"
         fullWidth

@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 const PREVIEW_ID = '__preview__';
 
@@ -94,8 +95,8 @@ export default function TeacherHome() {
     <Screen scroll={false}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Öğrencilerim</Text>
-          <Text style={styles.subtitle}>{rows.length} öğrenci</Text>
+          <Text style={styles.title}>{t('teacher.myStudents')}</Text>
+          <Text style={styles.subtitle}>{t('teacher.studentCount', { count: rows.length })}</Text>
         </View>
         <NotificationBell />
         <Button
@@ -109,10 +110,8 @@ export default function TeacherHome() {
       {rows.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyEmoji}>📚</Text>
-          <Text style={styles.emptyTitle}>Henüz öğrencin yok</Text>
-          <Text style={styles.emptyText}>
-            "+ Ekle" ile öğrencinin e-posta adresini gir.
-          </Text>
+          <Text style={styles.emptyTitle}>{t('teacher.noStudents')}</Text>
+          <Text style={styles.emptyText}>{t('teacher.noStudentsHint')}</Text>
         </View>
       ) : (
         <FlatList
@@ -122,7 +121,7 @@ export default function TeacherHome() {
           renderItem={({ item }) => (
             <Pressable style={styles.card} onPress={() => {
               if (item.id === PREVIEW_ID) {
-                showAlert('Önizleme', 'Bu kart yalnızca önizleme amaçlıdır. Gerçek öğrenci eklemek için "+ Ekle" butonunu kullan.');
+                showAlert(t('profile.previewAction'), t('teacher.previewNote'));
                 return;
               }
               router.push(`/teacher/student/${item.id}`);
@@ -131,7 +130,7 @@ export default function TeacherHome() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.full_name}</Text>
                 <Text style={styles.metaLine}>
-                  {item.child_age ? `${item.child_age} yaş · ` : ''}
+                  {item.child_age ? `${t('teacher.studentAge', { age: item.child_age })} · ` : ''}
                   Sv {item.level} · {item.total_xp} XP
                 </Text>
                 <View style={styles.badgeRow}>

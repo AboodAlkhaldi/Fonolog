@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen, Loading } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 interface Row {
   id: string;
@@ -37,7 +38,7 @@ export default function StudentsScreen() {
       <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
         <Ionicons name="chevron-back" size={28} color={theme.colors.text.primary} />
       </Pressable>
-      <Text style={styles.title}>Öğrenciler ({rows.length})</Text>
+      <Text style={styles.title}>{t('teacher.students.title', { count: rows.length })}</Text>
       <FlatList
         data={rows}
         keyExtractor={(r) => r.id}
@@ -47,7 +48,7 @@ export default function StudentsScreen() {
             <Text style={styles.avatar}>{item.child_avatar_emoji ?? '🦁'}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{item.full_name}</Text>
-              <Text style={styles.meta}>{item.email} · {item.child_age ?? '-'} yaş</Text>
+              <Text style={styles.meta}>{item.email} · {item.child_age ? t('teacher.studentAge', { age: item.child_age }) : '-'}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={theme.colors.text.muted} />
           </Pressable>

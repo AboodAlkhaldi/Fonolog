@@ -7,6 +7,7 @@ import { Screen, Button } from '@/components';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 export default function TeacherPreview() {
   const profile = useAuth((s) => s.profile);
@@ -19,20 +20,18 @@ export default function TeacherPreview() {
   const launch = () => {
     if (isAdminPreviewingTeacher) {
       showAlert(
-        'Buradan giremezsin',
-        'Öğretmen görünümündeyken öğrenci görünümüne geçemezsin. Yönetim paneline dön ve oradan "Öğrenci" sekmesini kullan.',
+        t('app.error_title'),
+        t('teacher.preview.alreadyIn'),
       );
       return;
     }
     showAlert(
-      'Öğrenci Görünümü',
-      isTrial
-        ? 'Deneme sürecinde günde 20 dakika öğrenci görünümünü test edebilirsin.'
-        : 'Öğrencinin uygulamayı nasıl gördüğünü deneyebilirsin.',
+      t('teacher.preview.confirmTitle'),
+      isTrial ? t('teacher.preview.confirmTrial') : t('teacher.preview.confirmFull'),
       [
-        { text: 'Vazgeç', style: 'cancel' },
+        { text: t('app.cancel'), style: 'cancel' },
         {
-          text: 'Başlat',
+          text: t('teacher.preview.startConfirm'),
           onPress: () => {
             startImpersonation('student');
             router.replace('/(tabs)');
@@ -44,19 +43,17 @@ export default function TeacherPreview() {
 
   return (
     <Screen>
-      <Text style={styles.title}>Öğrenci Görünümü</Text>
-      <Text style={styles.subtitle}>
-        Öğrencilerinin uygulamayı nasıl deneyimlediğini görmek için bu görünümü test edebilirsin.
-      </Text>
+      <Text style={styles.title}>{t('teacher.preview.title')}</Text>
+      <Text style={styles.subtitle}>{t('teacher.preview.subtitle')}</Text>
 
       <View style={styles.card}>
         <Text style={styles.cardEmoji}>🧒</Text>
-        <Text style={styles.cardTitle}>Öğrenci Modu</Text>
+        <Text style={styles.cardTitle}>{t('teacher.preview.cardTitle')}</Text>
         <Text style={styles.cardDesc}>
-          Tüm modüller, kelimeler ve karakter sistemi sana açık.{isTrial ? ' (20 dk/gün)' : ''}
+          {isTrial ? t('teacher.preview.cardDescTrial') : t('teacher.preview.cardDesc')}
         </Text>
         <Button
-          label="Görünüme Geç"
+          label={t('teacher.preview.startBtn')}
           variant="cta"
           size="lg"
           fullWidth
@@ -67,9 +64,7 @@ export default function TeacherPreview() {
 
       <View style={styles.note}>
         <Ionicons name="information-circle-outline" size={18} color={theme.colors.feedback.infoText} />
-        <Text style={styles.noteText}>
-          Görünümdeyken üst tarafta sarı bir bant göreceksin. "Çık" butonuyla bu menüye dönebilirsin.
-        </Text>
+        <Text style={styles.noteText}>{t('teacher.preview.hint')}</Text>
       </View>
     </Screen>
   );
