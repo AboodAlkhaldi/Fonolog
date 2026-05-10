@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { contentRepository } from '@/domain';
 import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 export default function CategoryEditor() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -36,7 +37,7 @@ export default function CategoryEditor() {
   }, [id]);
 
   const onSubmit = async () => {
-    if (!name) { showAlert('Eksik', 'Kategori adı zorunlu.'); return; }
+    if (!name) { showAlert(t('teacher.assignment.incompleteTitle'), t('admin.content.catNameRequired')); return; }
     setSubmitting(true);
 
     const payload: any = {
@@ -51,7 +52,7 @@ export default function CategoryEditor() {
       ? await supabase.from('categories').insert(payload).select().single()
       : await supabase.from('categories').update(payload).eq('id', id).select().single();
 
-    if (result.error) { showAlert('Hata', result.error.message); setSubmitting(false); return; }
+    if (result.error) { showAlert(t('app.error_title'), result.error.message); setSubmitting(false); return; }
     contentRepository.invalidate();
     router.back();
   };
@@ -63,17 +64,17 @@ export default function CategoryEditor() {
       <Pressable onPress={() => router.back()} style={styles.back} hitSlop={12}>
         <Ionicons name="chevron-back" size={28} color={theme.colors.text.primary} />
       </Pressable>
-      <Text style={styles.title}>{isNew ? 'Yeni Kategori' : 'Kategori Düzenle'}</Text>
+      <Text style={styles.title}>{isNew ? t('admin.content.catNew') : t('admin.content.catEdit')}</Text>
 
       <ScrollView>
-        <Input label="Ad" value={name} onChangeText={setName} required />
-        <Input label="Emoji" value={emoji} onChangeText={setEmoji} placeholder="ör: 🐱" />
-        <Input label="Açıklama (isteğe bağlı)" value={description} onChangeText={setDescription} multiline />
-        <Input label="Seviye (0 = ücretsiz, 1+ = premium)" value={level} onChangeText={setLevel}
+        <Input label={t('admin.content.nameLabel')} value={name} onChangeText={setName} required />
+        <Input label={t('admin.content.emojiLabel')} value={emoji} onChangeText={setEmoji} placeholder="ör: 🐱" />
+        <Input label={t('admin.content.descOptLabel')} value={description} onChangeText={setDescription} multiline />
+        <Input label={t('admin.content.levelLabel')} value={level} onChangeText={setLevel}
                keyboardType="numeric" />
 
         <Button
-          label={isNew ? 'Ekle' : 'Kaydet'}
+          label={isNew ? t('admin.content.newSuffix') : t('app.save')}
           variant="cta" size="lg" fullWidth
           loading={submitting} onPress={onSubmit}
           style={{ marginTop: theme.spacing[5] }}

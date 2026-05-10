@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { contentRepository } from '@/domain';
 import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 interface WordRow {
   id: string;
@@ -30,22 +31,22 @@ export default function AdminWords() {
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
-  const onDelete = (w: WordRow) => showAlert('Sil', `"${w.word_text}" kelimesini silmek istediğine emin misin?`, [
-    { text: 'Vazgeç', style: 'cancel' },
+  const onDelete = (w: WordRow) => showAlert(t('admin.content.deleteTitle'), t('admin.content.deleteConfirm', { name: w.word_text }), [
+    { text: t('app.cancel'), style: 'cancel' },
     {
-      text: 'Sil', style: 'destructive',
+      text: t('admin.content.deleteTitle'), style: 'destructive',
       onPress: async () => {
         const { error } = await supabase.from('words').update({ is_active: false } as any).eq('id', w.id);
-        if (error) showAlert('Hata', error.message);
+        if (error) showAlert(t('app.error_title'), error.message);
         else { contentRepository.invalidate(); load(); }
       },
     },
   ]);
 
   const showActions = (w: WordRow) => showAlert(w.word_text, '', [
-    { text: 'Düzenle', onPress: () => router.push(`/admin/content/word/${w.id}`) },
-    { text: 'Sil', style: 'destructive', onPress: () => onDelete(w) },
-    { text: 'Vazgeç', style: 'cancel' },
+    { text: t('admin.content.editBtn'), onPress: () => router.push(`/admin/content/word/${w.id}`) },
+    { text: t('admin.content.deleteTitle'), style: 'destructive', onPress: () => onDelete(w) },
+    { text: t('app.cancel'), style: 'cancel' },
   ]);
 
   const filtered = search
@@ -60,11 +61,11 @@ export default function AdminWords() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
           <Ionicons name="chevron-back" size={28} color={theme.colors.text.primary} />
         </Pressable>
-        <Text style={styles.title}>Kelimeler ({words.length})</Text>
+        <Text style={styles.title}>{t('admin.content.words')} ({words.length})</Text>
       </View>
 
       <Button
-        label="+ Yeni Kelime"
+        label={t('admin.content.newWordBtn')}
         variant="primary" size="md" fullWidth
         onPress={() => router.push('/admin/content/word/new')}
       />
@@ -72,7 +73,7 @@ export default function AdminWords() {
       <Input
         value={search}
         onChangeText={setSearch}
-        placeholder="Ara..."
+        placeholder={t('app.searchPh')}
         style={{ marginTop: theme.spacing[3] }}
       />
 

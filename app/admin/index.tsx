@@ -7,6 +7,7 @@ import { Screen, Loading } from '@/components';
 import { NotificationBell } from '@/components/common/NotificationBell';
 import { supabase } from '@/lib/supabase';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 interface UserRow {
   id: string;
@@ -50,7 +51,7 @@ export default function AdminDashboard() {
   return (
     <Screen scroll={false}>
       <View style={styles.headerRow}>
-        <Text style={styles.title}>Yönetim Paneli</Text>
+        <Text style={styles.title}>{t('admin.dashboard')}</Text>
         <NotificationBell />
       </View>
       <FlatList
@@ -60,21 +61,21 @@ export default function AdminDashboard() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListHeaderComponent={
           <View>
-            {renderSectionHeader('Öğrenciler', students.length)}
+            {renderSectionHeader(t('admin.students'), students.length)}
             {students.slice(0, 5).map((u) => <UserCard key={u.id} user={u} />)}
             {students.length > 5 && (
               <Pressable style={styles.seeAll} onPress={() => router.push('/admin/users-list?role=student')}>
-                <Text style={styles.seeAllText}>Tümünü gör →</Text>
+                <Text style={styles.seeAllText}>{t('admin.seeAll')}</Text>
               </Pressable>
             )}
 
             <View style={{ height: theme.spacing[5] }} />
 
-            {renderSectionHeader('Öğretmenler', teachers.length)}
+            {renderSectionHeader(t('admin.teachers'), teachers.length)}
             {teachers.slice(0, 5).map((u) => <UserCard key={u.id} user={u} />)}
             {teachers.length > 5 && (
               <Pressable style={styles.seeAll} onPress={() => router.push('/admin/users-list?role=teacher')}>
-                <Text style={styles.seeAllText}>Tümünü gör →</Text>
+                <Text style={styles.seeAllText}>{t('admin.seeAll')}</Text>
               </Pressable>
             )}
             <View style={{ height: theme.spacing[8] }} />

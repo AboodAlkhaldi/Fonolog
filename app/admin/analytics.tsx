@@ -5,42 +5,41 @@ import { LineChart} from 'react-native-chart-kit';
 import { Screen, Loading } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 const SCREEN_W = Dimensions.get('window').width - 40;
 
 export default function AdminAnalytics() {
-  const [signups, setSignups] = useState<any[]>([]);
-  const [sessions, setSessions] = useState<any[]>([]);
+  const [signups,    setSignups]    = useState<any[]>([]);
+  const [sessions,   setSessions]   = useState<any[]>([]);
   const [subSummary, setSubSummary] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [revenue,    setRevenue]    = useState<{ monthly_try: number; yearly_try: number; total_active: number } | null>(null);
+  const [loading,    setLoading]    = useState(true);
 
   useEffect(() => {
     (async () => {
-      const [a, b, c] = await Promise.all([
+      const [a, b, c, d] = await Promise.all([
         supabase.rpc('admin_get_signups'),
         supabase.rpc('admin_get_daily_sessions'),
         supabase.rpc('admin_get_subscription_summary'),
+        supabase.rpc('admin_get_revenue_estimate'),
       ]);
-      setSignups((a.data ?? []).slice(0, 14));     // last 14 days
+      setSignups((a.data ?? []).slice(0, 14));
       setSessions((b.data ?? []).slice(0, 14));
       setSubSummary(c.data ?? []);
+      if (d.data?.[0]) setRevenue(d.data[0]);
       setLoading(false);
     })();
   }, []);
 
   if (loading) return <Screen><Loading /></Screen>;
 
-  // Compute summary stats
-  const totalSubscribed = subSummary
-    .filter((s) => s.subscription_status !== 'free' && s.subscription_status !== 'trial')
-    .reduce((sum, s) => sum + Number(s.count), 0);
   const totalTrial = subSummary
     .filter((s) => s.subscription_status === 'trial')
     .reduce((sum, s) => sum + Number(s.count), 0);
-  const totalUsers = subSummary.reduce((sum, s) => sum + Number(s.count), 0);
-
-  // Estimate monthly revenue (rough — assume student plan)
-  const estMonthly = totalSubscribed * 99;
+  const totalUsers    = subSummary.reduce((sum, s) => sum + Number(s.count), 0);
+  const totalActive   = revenue?.total_active ?? 0;
+  const estMonthly    = revenue?.monthly_try  ?? 0;
 
   // Chart data
   const sessionData = sessions.slice().reverse();
@@ -58,21 +57,21 @@ export default function AdminAnalytics() {
 
   return (
     <Screen>
-      <Text style={styles.title}>Analiz</Text>
+      <Text style={styles.title}>{t('admin.analytics.title')}</Text>
 
       <View style={styles.statsRow}>
-        <Stat label="Toplam Kullanıcı" value={String(totalUsers)} />
-        <Stat label="Aktif Abone"      value={String(totalSubscribed)} />
-        <Stat label="Deneme"           value={String(totalTrial)} />
+        <Stat label={t('admin.analytics.totalUsers')}       value={String(totalUsers)} />
+        <Stat label={t('admin.analytics.activeSubscribers')} value={String(totalActive)} />
+        <Stat label={t('admin.analytics.trial')}            value={String(totalTrial)} />
       </View>
 
       <View style={[styles.statsRow, { marginTop: theme.spacing[2] }]}>
-        <Stat label="Tahmini Aylık" value={`₺${estMonthly}`} highlight />
+        <Stat label={t('admin.analytics.estimatedRevenue')} value={`₺${estMonthly.toLocaleString('tr-TR')}`} highlight />
       </View>
 
       {sessionValues.length > 0 && (
         <View style={styles.chartCard}>
-          <Text style={styles.chartTitle}>Son 14 Gün Oturumları</Text>
+          <Text style={styles.chartTitle}>{t('admin.analytics.sessions14Days')}</Text>
           <LineChart
             data={{
               labels: sessionLabels,
@@ -88,7 +87,7 @@ export default function AdminAnalytics() {
       )}
 
       <View style={styles.chartCard}>
-        <Text style={styles.chartTitle}>Abonelik Dağılımı</Text>
+        <Text style={styles.chartTitle}>{t('admin.analytics.subscriptionDist')}</Text>
         {subSummary.map((row) => (
           <View key={`${row.role}-${row.subscription_status}`} style={styles.distRow}>
             <Text style={styles.distLabel}>{row.role} · {row.subscription_status}</Text>

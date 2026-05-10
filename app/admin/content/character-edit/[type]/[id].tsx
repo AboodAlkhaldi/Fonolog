@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -8,7 +8,9 @@ import * as FileSystem from 'expo-file-system';
 
 import { Screen, Button, Input, Loading } from '@/components';
 import { supabase } from '@/lib/supabase';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 type Kind = 'base' | 'extra' | 'cat';
 
@@ -74,13 +76,13 @@ export default function CharacterEdit() {
     const { error } = await supabase.storage
       .from('characters')
       .upload(path, arr, { contentType, upsert: true });
-    if (error) { Alert.alert('Yükleme Hatası', error.message); return null; }
+    if (error) { showAlert(t('admin.content.loadError'), error.message); return null; }
     const { data } = supabase.storage.from('characters').getPublicUrl(path);
     return data.publicUrl;
   };
 
   const onSubmit = async () => {
-    if (!name) { Alert.alert('Eksik', 'Ad zorunlu.'); return; }
+    if (!name) { showAlert(t('teacher.assignment.incompleteTitle'), t('admin.content.charNameRequired')); return; }
     setSubmitting(true);
 
     try {
@@ -125,7 +127,7 @@ export default function CharacterEdit() {
 
       router.back();
     } catch (e: any) {
-      Alert.alert('Hata', e?.message ?? 'Kaydedilemedi');
+      showAlert(t('app.error_title'), e?.message ?? t('admin.content.saveFail'));
     } finally {
       setSubmitting(false);
     }
@@ -139,23 +141,23 @@ export default function CharacterEdit() {
         <Ionicons name="chevron-back" size={28} color={theme.colors.text.primary} />
       </Pressable>
       <Text style={styles.title}>
-        {type === 'base' ? 'Ana Karakter' : type === 'extra' ? 'Aksesuar' : 'Kategori'}
-        {isNew ? ' Ekle' : ' Düzenle'}
+        {type === 'base' ? t('admin.content.addBaseChar') : type === 'extra' ? t('admin.content.tabExtras') : t('admin.content.tabCats')}
+        {' '}{isNew ? t('admin.content.newSuffix') : t('admin.content.editSuffix')}
       </Text>
 
       <ScrollView>
-        <Input label="Ad" value={name} onChangeText={setName} required />
+        <Input label={t('admin.content.nameLabel')} value={name} onChangeText={setName} required />
         {type === 'base' && (
-          <Input label="Açıklama" value={description} onChangeText={setDescription} multiline />
+          <Input label={t('admin.content.descLabel')} value={description} onChangeText={setDescription} multiline />
         )}
         {(type === 'base' || type === 'extra') && (
-          <Input label="Açılma XP" value={unlockXp} onChangeText={setUnlockXp} keyboardType="numeric" />
+          <Input label={t('admin.content.unlockXpLabel')} value={unlockXp} onChangeText={setUnlockXp} keyboardType="numeric" />
         )}
         {type === 'extra' && (
           <>
-            <Text style={styles.label}>Kategori</Text>
+            <Text style={styles.label}>{t('admin.content.tabCats')}</Text>
             <Input value={categoryId} onChangeText={setCategoryId} placeholder="hat / shirt / shoes / acc / bg" />
-            <Text style={styles.label}>Nadirlik</Text>
+            <Text style={styles.label}>{t('admin.content.rarityLabel')}</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {(['common','rare','legendary'] as const).map((r) => (
                 <Pressable key={r} onPress={() => setRarity(r)}
@@ -169,22 +171,22 @@ export default function CharacterEdit() {
 
         {(type === 'base' || type === 'extra') && (
           <>
-            <Text style={styles.label}>Asset Türü</Text>
+            <Text style={styles.label}>{t('admin.content.assetTypeLabel')}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: theme.spacing[3] }}>
-              {(['png','svg','lottie'] as const).map((t) => (
-                <Pressable key={t} onPress={() => setAssetType(t)}
-                           style={[styles.rChip, assetType === t && styles.rChipActive]}>
-                  <Text style={[styles.rChipText, assetType === t && styles.rChipTextActive]}>{t.toUpperCase()}</Text>
+              {(['png','svg','lottie'] as const).map((at) => (
+                <Pressable key={at} onPress={() => setAssetType(at)}
+                           style={[styles.rChip, assetType === at && styles.rChipActive]}>
+                  <Text style={[styles.rChipText, assetType === at && styles.rChipTextActive]}>{at.toUpperCase()}</Text>
                 </Pressable>
               ))}
             </View>
-            <Button label={assetUri ? 'Dosya seçildi ✓' : `${assetType.toUpperCase()} dosyası seç`}
+            <Button label={assetUri ? t('admin.content.fileSelected') : t('admin.content.filePick', { type: assetType.toUpperCase() })}
                     variant="secondary" size="md" fullWidth onPress={pickAsset} />
           </>
         )}
 
         <Button
-          label="Kaydet"
+          label={t('app.save')}
           variant="cta" size="lg" fullWidth
           loading={submitting} onPress={onSubmit}
           style={{ marginTop: theme.spacing[5] }}

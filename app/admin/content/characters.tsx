@@ -7,6 +7,7 @@ import { Screen, Loading, Button, Badge } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 type Tab = 'base' | 'extras' | 'cats';
 
@@ -31,11 +32,11 @@ export default function AdminCharacters() {
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
-  const onAdd = () => showAlert('Ne ekleyeceksin?', '', [
-    { text: 'Ana Karakter',     onPress: () => router.push('/admin/content/character-edit/base/new') },
-    { text: 'Aksesuar Kategorisi', onPress: () => router.push('/admin/content/character-edit/cat/new') },
-    { text: 'Aksesuar (Extra)',  onPress: () => router.push('/admin/content/character-edit/extra/new') },
-    { text: 'Vazgeç', style: 'cancel' },
+  const onAdd = () => showAlert(t('admin.content.addTitle'), '', [
+    { text: t('admin.content.addBaseChar'),  onPress: () => router.push('/admin/content/character-edit/base/new') },
+    { text: t('admin.content.addCatChar'),   onPress: () => router.push('/admin/content/character-edit/cat/new') },
+    { text: t('admin.content.addExtraChar'), onPress: () => router.push('/admin/content/character-edit/extra/new') },
+    { text: t('app.cancel'), style: 'cancel' },
   ]);
 
   if (loading) return <Screen><Loading /></Screen>;
@@ -46,17 +47,17 @@ export default function AdminCharacters() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
           <Ionicons name="chevron-back" size={28} color={theme.colors.text.primary} />
         </Pressable>
-        <Text style={styles.title}>Karakterler</Text>
+        <Text style={styles.title}>{t('admin.content.characters')}</Text>
       </View>
 
-      <Button label="+ Ekle" variant="primary" size="md" fullWidth onPress={onAdd} />
+      <Button label={t('admin.content.addBtn')} variant="primary" size="md" fullWidth onPress={onAdd} />
 
       <View style={styles.tabs}>
-        {(['base','extras','cats'] as const).map((t) => (
-          <Pressable key={t} onPress={() => setTab(t)}
-                     style={[styles.tab, tab === t && styles.tabActive]}>
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t === 'base' ? 'Ana' : t === 'extras' ? 'Aksesuar' : 'Kategori'}
+        {(['base','extras','cats'] as const).map((tabKey) => (
+          <Pressable key={tabKey} onPress={() => setTab(tabKey)}
+                     style={[styles.tab, tab === tabKey && styles.tabActive]}>
+            <Text style={[styles.tabText, tab === tabKey && styles.tabTextActive]}>
+              {tabKey === 'base' ? t('admin.content.tabBase') : tabKey === 'extras' ? t('admin.content.tabExtras') : t('admin.content.tabCats')}
             </Text>
           </Pressable>
         ))}
@@ -74,7 +75,7 @@ export default function AdminCharacters() {
               <View style={styles.thumb}><Text style={{ fontSize: 24 }}>🦁</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.meta}>Açılma: {item.unlock_xp} XP</Text>
+                <Text style={styles.meta}>{t('admin.content.unlockXp', { xp: item.unlock_xp })}</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={theme.colors.text.muted} />
             </Pressable>

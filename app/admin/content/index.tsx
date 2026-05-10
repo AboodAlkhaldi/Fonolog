@@ -5,31 +5,32 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Screen } from '@/components';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 export default function AdminContent() {
   return (
     <Screen>
-      <Text style={styles.title}>İçerik Yönetimi</Text>
-      <Text style={styles.subtitle}>Kelime, kategori ve karakterleri yönet.</Text>
+      <Text style={styles.title}>{t('admin.content.title')}</Text>
+      <Text style={styles.subtitle}>{t('admin.content.subtitle')}</Text>
 
       <Section
         icon="text-outline"
-        title="Kelimeler"
-        desc="Yeni kelime ekle, mevcut kelimeleri düzenle veya sil."
+        title={t('admin.content.words')}
+        desc={t('admin.content.wordsDesc')}
         onPress={() => router.push('/admin/content/words')}
       />
 
       <Section
         icon="folder-outline"
-        title="Kategoriler"
-        desc="Kelime kategorilerini yönet."
+        title={t('admin.content.categories')}
+        desc={t('admin.content.categoriesDesc')}
         onPress={() => router.push('/admin/content/categories')}
       />
 
       <Section
         icon="happy-outline"
-        title="Karakterler"
-        desc="Ana karakterler, kategoriler ve aksesuarları yönet."
+        title={t('admin.content.characters')}
+        desc={t('admin.content.charactersDesc')}
         onPress={() => router.push('/admin/content/characters')}
       />
     </Screen>

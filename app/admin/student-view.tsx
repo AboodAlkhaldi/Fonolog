@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen, Button } from '@/components';
 import { useAuth } from '@/store/auth';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 export default function AdminStudentView() {
   const startImpersonation = useAuth((s) => s.startImpersonation);
@@ -17,27 +18,20 @@ export default function AdminStudentView() {
 
   return (
     <Screen>
-      <Text style={styles.title}>Öğrenci Görünümü</Text>
-      <Text style={styles.subtitle}>
-        Öğrencinin uygulamayı nasıl deneyimlediğini incele. Tüm modüller, kelimeler ve
-        karakter sistemi açık.
-      </Text>
+      <Text style={styles.title}>{t('admin.studentView.title')}</Text>
+      <Text style={styles.subtitle}>{t('admin.studentView.subtitle')}</Text>
 
       <View style={styles.card}>
         <Text style={styles.emoji}>🧒</Text>
-        <Text style={styles.cardTitle}>Öğrenci Modu</Text>
-        <Text style={styles.cardDesc}>
-          Tüm 24 modül, tüm kelimeler, tüm kategoriler erişilebilir.
-        </Text>
-        <Button label="Görünüme Geç" variant="cta" size="lg" fullWidth
+        <Text style={styles.cardTitle}>{t('admin.studentView.cardTitle')}</Text>
+        <Text style={styles.cardDesc}>{t('admin.studentView.cardDesc')}</Text>
+        <Button label={t('admin.studentView.startBtn')} variant="cta" size="lg" fullWidth
                 onPress={launch} style={{ marginTop: theme.spacing[4] }} />
       </View>
 
       <View style={styles.note}>
         <Ionicons name="information-circle-outline" size={18} color={theme.colors.feedback.infoText} />
-        <Text style={styles.noteText}>
-          Üst bantta "Çık" tuşuyla yönetim paneline dönersin. Süre sınırı yok.
-        </Text>
+        <Text style={styles.noteText}>{t('admin.studentView.hint')}</Text>
       </View>
     </Screen>
   );

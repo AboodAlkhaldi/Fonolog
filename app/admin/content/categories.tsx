@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { contentRepository } from '@/domain';
 import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 export default function AdminCategories() {
   const [cats, setCats] = useState<any[]>([]);
@@ -21,19 +22,19 @@ export default function AdminCategories() {
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
-  const onDelete = (cat: any) => showAlert('Sil', `"${cat.name}" kategorisini silmek istediğine emin misin?`, [
-    { text: 'Vazgeç', style: 'cancel' },
-    { text: 'Sil', style: 'destructive', onPress: async () => {
+  const onDelete = (cat: any) => showAlert(t('admin.content.deleteTitle'), t('admin.content.deleteConfirm', { name: cat.name }), [
+    { text: t('app.cancel'), style: 'cancel' },
+    { text: t('admin.content.deleteTitle'), style: 'destructive', onPress: async () => {
       const { error } = await supabase.from('categories').update({ is_active: false } as any).eq('id', cat.id);
-      if (error) showAlert('Hata', error.message);
+      if (error) showAlert(t('app.error_title'), error.message);
       else { contentRepository.invalidate(); load(); }
     }},
   ]);
 
   const showActions = (cat: any) => showAlert(cat.name, '', [
-    { text: 'Düzenle', onPress: () => router.push(`/admin/content/category/${cat.id}`) },
-    { text: 'Sil', style: 'destructive', onPress: () => onDelete(cat) },
-    { text: 'Vazgeç', style: 'cancel' },
+    { text: t('admin.content.editBtn'), onPress: () => router.push(`/admin/content/category/${cat.id}`) },
+    { text: t('admin.content.deleteTitle'), style: 'destructive', onPress: () => onDelete(cat) },
+    { text: t('app.cancel'), style: 'cancel' },
   ]);
 
   if (loading) return <Screen><Loading /></Screen>;
@@ -44,11 +45,11 @@ export default function AdminCategories() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
           <Ionicons name="chevron-back" size={28} color={theme.colors.text.primary} />
         </Pressable>
-        <Text style={styles.title}>Kategoriler ({cats.length})</Text>
+        <Text style={styles.title}>{t('admin.content.categories')} ({cats.length})</Text>
       </View>
 
       <Button
-        label="+ Yeni Kategori"
+        label={t('admin.content.newCategoryBtn')}
         variant="primary" size="md" fullWidth
         onPress={() => router.push('/admin/content/category/new')}
       />

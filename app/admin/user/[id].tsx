@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen, Loading, Badge } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 export default function AdminUserDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -72,7 +73,9 @@ export default function AdminUserDetail() {
             </View>
 
             <Text style={styles.sectionTitle}>
-              {isStudent ? 'Bağlı Öğretmenler' : 'Bağlı Öğrenciler'} ({related.length})
+              {isStudent
+                ? t('admin.linkedTeachers', { count: related.length })
+                : t('admin.linkedStudents', { count: related.length })}
             </Text>
           </View>
         }
@@ -86,7 +89,7 @@ export default function AdminUserDetail() {
             <Ionicons name="chevron-forward" size={20} color={theme.colors.text.muted} />
           </Pressable>
         )}
-        ListEmptyComponent={<Text style={styles.empty}>Bağlantı yok.</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>{t('admin.noRelated')}</Text>}
       />
     </Screen>
   );
