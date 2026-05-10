@@ -14,12 +14,14 @@ import { showAlert } from '@/store/alert';
 import { checkUsage, recordUsage } from '@/lib/entitlements';
 import { subscriptionLabel } from '@/lib/access-tier';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 export default function ProfileTab() {
   const realProfile   = useAuth((s) => s.profile);
   const impersonating = useAuth((s) => s.impersonating);
   const profile       = withPreviewPlaceholders(realProfile, impersonating);
-  const signOut = useAuth((s) => s.signOut);
+  const signOut          = useAuth((s) => s.signOut);
+  const deactivateAccount = useAuth((s) => s.deactivateAccount);
   const [linkedTeachers, setLinkedTeachers] = useState<any[]>([]);
 
   useEffect(() => {
@@ -44,17 +46,17 @@ export default function ProfileTab() {
 
   const onGenerateOwnPdf = async () => {
     if (impersonating) {
-      showAlert('Önizleme', 'Bu işlem önizleme modunda kullanılamaz.');
+      showAlert(t('profile.previewAction'), t('profile.previewActionMsg'));
       return;
     }
     const usage = await checkUsage(realProfile, 'pdf_student');
     if (!usage.allowed) {
       showAlert(
-        'Kota Doldu',
-        `Bu hafta ${usage.limit} PDF kotanı kullandın. Sınırsız PDF için Pro'ya yükselt.`,
+        t('profile.pdfQuotaTitle'),
+        t('profile.pdfQuotaMsg', { limit: usage.limit }),
         [
-          { text: 'Vazgeç', style: 'cancel' },
-          { text: 'Pro\'ya Geç', onPress: () => router.push('/paywall') },
+          { text: t('app.cancel'), style: 'cancel' },
+          { text: t('profile.pdfUpgradeBtn'), onPress: () => router.push('/paywall') },
         ],
       );
       return;
@@ -69,7 +71,7 @@ export default function ProfileTab() {
         },
         body: JSON.stringify({ student_id: realProfile?.id }),
       });
-      if (!res.ok) { showAlert('Hata', await res.text()); return; }
+      if (!res.ok) { showAlert(t('app.error_title'), await res.text()); return; }
       const { html } = await res.json();
       const { uri } = await Print.printToFileAsync({ html });
       if (await Sharing.isAvailableAsync()) {
@@ -78,71 +80,110 @@ export default function ProfileTab() {
       await recordUsage(realProfile, 'pdf_student');
       const after = await checkUsage(realProfile, 'pdf_student');
       if (after.limit > 0 && after.remaining >= 0) {
-        showAlert('Tamam', `PDF oluşturuldu. Bu hafta kalan kota: ${after.remaining}/${after.limit}`);
+        showAlert(t('app.ok'), t('profile.pdfSuccess', { remaining: after.remaining, limit: after.limit }));
       }
     } catch (e) {
-      showAlert('Hata', 'PDF oluşturulurken hata: ' + (e instanceof Error ? e.message : String(e)));
+      showAlert(t('app.error_title'), t('profile.pdfError', { error: e instanceof Error ? e.message : String(e) }));
     }
+  };
+
+  const onResetPassword = () => {
+    if (impersonating) return;
+    showAlert(
+      t('auth.deactivate.resetPasswordBtn'),
+      t('settings.resetPasswordMsg'),
+      [
+        { text: t('app.cancel'), style: 'cancel' },
+        { text: t('settings.continueBtn'), onPress: () => router.push('/reset-password') },
+      ],
+    );
+  };
+
+  const onDeleteAccount = () => {
+    if (impersonating) return;
+    showAlert(
+      t('auth.deactivate.confirm1Title'),
+      t('auth.deactivate.confirm1Message'),
+      [
+        { text: t('app.cancel'), style: 'cancel' },
+        {
+          text: t('auth.deactivate.confirm1Yes'),
+          style: 'destructive',
+          onPress: () => showAlert(
+            t('auth.deactivate.confirm2Title'),
+            t('auth.deactivate.confirm2Message'),
+            [
+              { text: t('app.cancel'), style: 'cancel' },
+              {
+                text: t('auth.deactivate.confirm2Yes'),
+                style: 'destructive',
+                onPress: () => deactivateAccount().catch((e: any) => showAlert(t('app.error_title'), e?.message ?? String(e))),
+              },
+            ],
+          ),
+        },
+      ],
+    );
   };
 
   const onSignOut = () => {
     if (impersonating) {
       showAlert(
-        'Önizleme modundasın',
-        'Buradan çıkış yapamazsın. Üstteki sarı bantta yer alan "Çık" tuşuna bastığında önizlemeden çıkacaksın.',
+        t('settings.previewMode'),
+        t('settings.previewSignOutStudent'),
       );
       return;
     }
-    showAlert('Çıkış Yap', 'Hesabından çıkmak istediğinden emin misin?', [
-      { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Çıkış Yap', style: 'destructive', onPress: signOut },
+    showAlert(t('profile.signOut'), t('profile.signOutConfirm'), [
+      { text: t('app.cancel'), style: 'cancel' },
+      { text: t('profile.signOut'), style: 'destructive', onPress: signOut },
     ]);
   };
 
   return (
     <Screen>
-      <Text style={styles.title}>Profil</Text>
+      <Text style={styles.title}>{t('profile.title')}</Text>
 
       <View style={styles.card}>
-        <Text style={styles.label}>Çocuk</Text>
+        <Text style={styles.label}>{t('profile.child')}</Text>
         <Text style={styles.value}>{profile.full_name}</Text>
-        <Text style={styles.label}>Yaş</Text>
+        <Text style={styles.label}>{t('profile.age')}</Text>
         <Text style={styles.value}>{profile.child_age ?? '-'}</Text>
-        <Text style={styles.label}>E-posta</Text>
+        <Text style={styles.label}>{t('profile.email')}</Text>
         <Text style={styles.value}>{profile.email}</Text>
       </View>
 
       {/* Subscription */}
       <Pressable style={styles.card} onPress={() => router.push('/settings/plan-details')}>
         <View style={styles.cardHeaderRow}>
-          <Text style={styles.cardTitle}>Abonelik</Text>
+          <Text style={styles.cardTitle}>{t('profile.subscription')}</Text>
           <View style={[styles.tag, profile.subscription_status === 'trial' && styles.tagTrial]}>
             <Text style={styles.tagText}>{subscriptionLabel(profile.subscription_status)}</Text>
           </View>
         </View>
         {trialDays !== null ? (
-          <Text style={styles.cardDesc}>Deneme süreci: {trialDays} gün kaldı · Detaylar →</Text>
+          <Text style={styles.cardDesc}>{t('profile.trialInfo', { days: trialDays })}</Text>
         ) : profile.subscription_status === 'free' ? (
-          <Text style={styles.cardDesc}>Ücretsiz plan · Yükselt →</Text>
+          <Text style={styles.cardDesc}>{t('profile.freePlanUpgrade')}</Text>
         ) : (
-          <Text style={styles.cardDesc}>Aktif · Detaylar →</Text>
+          <Text style={styles.cardDesc}>{t('profile.activeDetails')}</Text>
         )}
       </Pressable>
 
       {/* PDF Report */}
       <Pressable style={styles.card} onPress={onGenerateOwnPdf}>
         <View style={styles.cardHeaderRow}>
-          <Text style={styles.cardTitle}>📄 PDF Raporu</Text>
+          <Text style={styles.cardTitle}>{t('profile.pdfReport')}</Text>
           <Ionicons name="chevron-forward" size={18} color={theme.colors.text.muted} />
         </View>
-        <Text style={styles.cardDesc}>İlerlemeni PDF olarak indir ve paylaş.</Text>
+        <Text style={styles.cardDesc}>{t('profile.pdfReportDesc')}</Text>
       </Pressable>
 
       {/* Linked teachers */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Öğretmenim</Text>
+        <Text style={styles.cardTitle}>{t('profile.myTeacher')}</Text>
         {linkedTeachers.length === 0 ? (
-          <Text style={styles.cardDesc}>Henüz bir öğretmenle bağlantın yok.</Text>
+          <Text style={styles.cardDesc}>{t('profile.noTeacher')}</Text>
         ) : (
           linkedTeachers.map((t) => (
             <View key={t.id} style={styles.teacherRow}>
@@ -156,9 +197,26 @@ export default function ProfileTab() {
         )}
       </View>
 
+      <Pressable onPress={() => router.push('/settings/terms')} style={styles.actionRow}>
+        <Ionicons name="document-text-outline" size={20} color={theme.colors.text.secondary} />
+        <Text style={styles.actionText}>{t('profile.privacyTerms')}</Text>
+        <Ionicons name="chevron-forward" size={16} color={theme.colors.text.muted} />
+      </Pressable>
+
+      <Pressable onPress={onResetPassword} style={styles.actionRow}>
+        <Ionicons name="key-outline" size={20} color={theme.colors.text.secondary} />
+        <Text style={styles.actionText}>{t('auth.deactivate.resetPasswordBtn')}</Text>
+        <Ionicons name="chevron-forward" size={16} color={theme.colors.text.muted} />
+      </Pressable>
+
+      <Pressable onPress={onDeleteAccount} style={styles.deleteRow}>
+        <Ionicons name="trash-outline" size={20} color={theme.colors.feedback.errorText} />
+        <Text style={styles.deleteText}>{t('auth.deactivate.deleteAccountBtn')}</Text>
+      </Pressable>
+
       <Pressable onPress={onSignOut} style={styles.signOut}>
         <Ionicons name="log-out-outline" size={20} color={theme.colors.feedback.errorText} />
-        <Text style={styles.signOutText}>Çıkış Yap</Text>
+        <Text style={styles.signOutText}>{t('profile.signOut')}</Text>
       </Pressable>
     </Screen>
   );
@@ -189,6 +247,28 @@ const styles = StyleSheet.create({
   },
   teacherName: { ...theme.typography.body, color: theme.colors.text.primary },
   teacherMeta: { ...theme.typography.caption, color: theme.colors.text.muted },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[2],
+    backgroundColor: theme.colors.background.secondary,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing[4],
+    marginBottom: theme.spacing[2],
+  },
+  actionText: { ...theme.typography.body, color: theme.colors.text.primary, flex: 1 },
+  deleteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing[2],
+    borderWidth: 1,
+    borderColor: theme.colors.feedback.error + '60',
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing[4],
+    marginBottom: theme.spacing[2],
+  },
+  deleteText: { ...theme.typography.bodyMedium, color: theme.colors.feedback.errorText },
   signOut: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -199,7 +279,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.feedback.error + '60',
     borderRadius: theme.radius.lg,
     padding: theme.spacing[4],
-    marginTop: theme.spacing[4],
+    marginTop: theme.spacing[2],
   },
   signOutText: { ...theme.typography.bodyMedium, color: theme.colors.feedback.errorText },
 });

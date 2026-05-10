@@ -7,8 +7,10 @@ import Purchases, { type CustomerInfo } from 'react-native-purchases';
 import { Screen, Button, Loading, Badge } from '@/components';
 import { useAuth } from '@/store/auth';
 import { getAccessTier, trialDaysRemaining, subscriptionLabel } from '@/lib/access-tier';
+import { differenceInCalendarDays } from 'date-fns';
 import { getPricing, formatPrice, type PricingRow } from '@/lib/pricing';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 const SUPPORT_EMAIL = 'alisaglam@gmail.com';
 
@@ -46,6 +48,13 @@ export default function PlanDetails() {
 
   if (loading) return <Screen><Loading /></Screen>;
 
+  const expiryDaysLeft = (() => {
+    const iso = activeEntitlement?.expirationDate ?? profile?.subscription_expires ?? null;
+    if (!iso) return null;
+    const days = differenceInCalendarDays(new Date(iso), new Date());
+    return days >= 0 && days <= 5 ? days : null;
+  })();
+
   const activeEntitlement =
     customerInfo?.entitlements.active['okuma_expert'] ??
     customerInfo?.entitlements.active['okuma_student'] ??
@@ -59,7 +68,7 @@ export default function PlanDetails() {
 
   const statusLabel =
     tier === 'admin'
-      ? 'Yönetici'
+      ? t('planDetails.adminLabel')
       : subscriptionLabel(profile?.subscription_status);
 
   const statusVariant =
@@ -72,56 +81,68 @@ export default function PlanDetails() {
       <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
         <Ionicons name="chevron-back" size={28} color={theme.colors.text.primary} />
       </Pressable>
-      <Text style={styles.title}>Plan Detayları</Text>
+      <Text style={styles.title}>{t('planDetails.title')}</Text>
 
       <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing[6] }}>
         <View style={styles.card}>
           <View style={styles.row}>
-            <Text style={styles.label}>Mevcut plan</Text>
+            <Text style={styles.label}>{t('planDetails.currentPlan')}</Text>
             <Badge label={statusLabel} variant={statusVariant} />
           </View>
           <Text style={styles.value}>
-            {planRow?.display_name ?? (tier === 'trial' ? 'Pro Deneme' : 'Ücretsiz Plan')}
+            {planRow?.display_name ?? (tier === 'trial' ? t('planDetails.trialFallback') : t('planDetails.freeFallback'))}
           </Text>
           {planRow ? (
-            <Text style={styles.metaLine}>{formatPrice(planRow)} / {planRow.period === 'monthly' ? 'ay' : 'yıl'}</Text>
+            <Text style={styles.metaLine}>{formatPrice(planRow)} / {planRow.period === 'monthly' ? t('planDetails.periodMonth') : t('planDetails.periodYear')}</Text>
           ) : null}
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.label}>{willRenew ? 'Sıradaki yenileme' : 'Geçerlilik bitiş'}</Text>
+          <Text style={styles.label}>{willRenew ? t('planDetails.renewLabel') : t('planDetails.expiresLabel')}</Text>
           <Text style={styles.value}>{formatDate(expiresIso)}</Text>
           {trialDays !== null ? (
-            <Text style={styles.metaLine}>Deneme süreci: {trialDays} gün kaldı</Text>
+            <Text style={styles.metaLine}>{t('planDetails.trialRemaining', { days: trialDays })}</Text>
           ) : null}
         </View>
 
-        {tier !== 'subscribed' ? (
+        {/* Expiry warning — shown when plan expires in ≤5 days and won't auto-renew */}
+        {expiryDaysLeft !== null && !willRenew && (
+          <View style={styles.expiryWarning}>
+            <Ionicons name="warning-outline" size={18} color={theme.colors.feedback.warningText} />
+            <Text style={styles.expiryWarningText}>
+              {expiryDaysLeft === 0
+                ? t('planDetails.expiryToday')
+                : t('planDetails.expirySoon', { days: expiryDaysLeft })}
+            </Text>
+          </View>
+        )}
+
+        {(tier !== 'subscribed' || (expiryDaysLeft !== null && !willRenew)) ? (
           <Button
-            label={tier === 'trial' ? 'Pro\'ya Yükselt' : 'Pro\'ya Geç'}
+            label={tier === 'trial' ? t('planDetails.upgradeTrial') : expiryDaysLeft !== null ? t('planDetails.renewNow') : t('planDetails.upgradeFree')}
             variant="cta" size="lg" fullWidth
             onPress={() => router.push('/paywall')}
             style={{ marginTop: theme.spacing[3] }}
           />
         ) : null}
 
-        <Text style={styles.section}>Pro Avantajlar</Text>
+        <Text style={styles.section}>{t('planDetails.proTitle')}</Text>
         <View style={styles.featuresCard}>
-          <Feature icon="game-controller-outline" text="Tüm 24 oyun modülü açık" />
-          <Feature icon="document-text-outline"   text="Sınırsız PDF rapor" />
-          <Feature icon="people-outline"          text="Sınırsız öğrenci / ödev (öğretmen)" />
-          <Feature icon="mic-outline"             text="Telaffuz egzersizleri" />
-          <Feature icon="flame-outline"           text="Günlük seri bonusu" />
+          <Feature icon="game-controller-outline" text={t('planDetails.proF1')} />
+          <Feature icon="document-text-outline"   text={t('planDetails.proF2')} />
+          <Feature icon="people-outline"          text={t('planDetails.proF3')} />
+          <Feature icon="mic-outline"             text={t('planDetails.proF4')} />
+          <Feature icon="flame-outline"           text={t('planDetails.proF5')} />
         </View>
 
-        <Text style={styles.section}>Destek</Text>
+        <Text style={styles.section}>{t('planDetails.supportTitle')}</Text>
         <Pressable
           style={styles.supportCard}
           onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Okuma%20Dedektifi%20Destek`)}
         >
           <Ionicons name="mail-outline" size={22} color={theme.colors.brand.primary} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.value}>Bize yaz</Text>
+            <Text style={styles.value}>{t('planDetails.supportContact')}</Text>
             <Text style={styles.metaLine}>{SUPPORT_EMAIL}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={theme.colors.text.muted} />
@@ -163,5 +184,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: theme.spacing[3],
     backgroundColor: theme.colors.background.secondary,
     padding: theme.spacing[4], borderRadius: theme.radius.lg,
+  },
+  expiryWarning: {
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2],
+    backgroundColor: theme.colors.feedback.warningSubtle,
+    padding: theme.spacing[3], borderRadius: theme.radius.md,
+    marginTop: theme.spacing[3],
+  },
+  expiryWarningText: {
+    ...theme.typography.body,
+    color: theme.colors.feedback.warningText,
+    flex: 1,
   },
 });

@@ -9,23 +9,16 @@ import { useAuth } from '@/store/auth';
 import { showAlert } from '@/store/alert';
 import { getAccessTier } from '@/lib/access-tier';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
-const STUDENT_FEATURES = [
-  '22 kategoride 393+ Türkçe kelime',
-  '24 farklı eğitici oyun modülü',
-  'Telaffuz egzersizleri (mikrofon ile)',
-  'Karakter, XP, seviye ve seri sistemi',
-  'PDF ilerleme raporu',
-  'Reklamsız deneyim',
+const STUDENT_FEATURES = () => [
+  t('paywall.studentF1'), t('paywall.studentF2'), t('paywall.studentF3'),
+  t('paywall.studentF4'), t('paywall.studentF5'), t('paywall.studentF6'),
 ];
 
-const TEACHER_FEATURES = [
-  'Sınırsız öğrenci ekleyebilirsin',
-  'Öğrencilerine özel ödevler ata',
-  'Detaylı PDF raporları',
-  'Öğrenci görünümü süresiz',
-  'Bildirim gönder',
-  'Tüm öğrenci özellikleri',
+const TEACHER_FEATURES = () => [
+  t('paywall.teacherF1'), t('paywall.teacherF2'), t('paywall.teacherF3'),
+  t('paywall.teacherF4'), t('paywall.teacherF5'), t('paywall.teacherF6'),
 ];
 
 export default function PaywallScreen() {
@@ -37,7 +30,7 @@ export default function PaywallScreen() {
   const [loading, setLoading] = useState(false);
 
   const isTeacher = profile?.role === 'teacher';
-  const features = isTeacher ? TEACHER_FEATURES : STUDENT_FEATURES;
+  const features = isTeacher ? TEACHER_FEATURES() : STUDENT_FEATURES();
   const tier = getAccessTier(profile);
   const isPro = tier === 'subscribed';
 
@@ -71,11 +64,11 @@ export default function PaywallScreen() {
     try {
       await purchasePackage(pkg);
       await refreshProfile();
-      showAlert('Teşekkürler!', 'Pro üyeliğin başladı. İyi keşifler!', [
-        { text: 'Tamam', onPress: () => router.replace(isTeacher ? '/teacher' : '/(tabs)') },
+      showAlert(t('paywall.successTitle'), t('paywall.successMsg'), [
+        { text: t('app.ok'), onPress: () => router.replace(isTeacher ? '/teacher' : '/(tabs)') },
       ]);
     } catch (e: any) {
-      if (!e?.userCancelled) showAlert('Hata', e?.message ?? 'Satın alma başarısız');
+      if (!e?.userCancelled) showAlert(t('app.error_title'), e?.message ?? t('paywall.purchaseFail'));
     } finally {
       setLoading(false);
     }
@@ -86,9 +79,9 @@ export default function PaywallScreen() {
     try {
       await restorePurchases();
       await refreshProfile();
-      showAlert('Tamamlandı', 'Satın almalar geri yüklendi.');
+      showAlert(t('paywall.restoreTitle'), t('paywall.restoreMsg'));
     } catch (e: any) {
-      showAlert('Hata', e?.message ?? 'Geri yükleme başarısız');
+      showAlert(t('app.error_title'), e?.message ?? t('paywall.restoreFail'));
     } finally {
       setLoading(false);
     }
@@ -104,11 +97,9 @@ export default function PaywallScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.emoji}>⭐</Text>
-        <Text style={styles.title}>{isTeacher ? 'Öğretmen Pro' : 'Pro Üyelik'}</Text>
+        <Text style={styles.title}>{isTeacher ? t('paywall.titleTeacher') : t('paywall.titleStudent')}</Text>
         <Text style={styles.subtitle}>
-          {isTeacher
-            ? 'Öğrencilerine sınırsız erişim sağla.'
-            : 'Tüm içeriği aç ve gelişimini hızlandır.'}
+          {isTeacher ? t('paywall.subtitleTeacher') : t('paywall.subtitleStudent')}
         </Text>
 
         <View style={styles.features}>
@@ -123,11 +114,8 @@ export default function PaywallScreen() {
         {unavailable ? (
           <View style={styles.unavailableCard}>
             <Ionicons name="construct-outline" size={32} color={theme.colors.feedback.warningText} />
-            <Text style={styles.unavailableTitle}>Yakında!</Text>
-            <Text style={styles.unavailableDesc}>
-              Şu anda satın alma sistemi hazırlanıyor. Aboneliğin için erkenden bilgi almak
-              istersen, bize ulaş:
-            </Text>
+            <Text style={styles.unavailableTitle}>{t('paywall.unavailableTitle')}</Text>
+            <Text style={styles.unavailableDesc}>{t('paywall.unavailableDesc')}</Text>
             <Pressable
               onPress={() => Linking.openURL('mailto:info@villaakademia.com?subject=Okuma%20Dedektifi%20Abonelik')}
               style={styles.contactBtn}
@@ -150,7 +138,7 @@ export default function PaywallScreen() {
 
         {!unavailable && (
           <Button
-            label="Satın almaları geri yükle"
+            label={t('paywall.restoreBtn')}
             variant="ghost" size="md" fullWidth
             onPress={onRestore}
             loading={loading}
@@ -158,9 +146,7 @@ export default function PaywallScreen() {
           />
         )}
 
-        <Text style={styles.legal}>
-          Abonelik otomatik yenilenir. İstediğin zaman App Store / Play Store ayarlarından iptal edebilirsin.
-        </Text>
+        <Text style={styles.legal}>{t('paywall.legal')}</Text>
       </ScrollView>
     </Screen>
   );

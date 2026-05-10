@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from '@tanstack/react-query';
 
 import { Screen, Button, ErrorBanner } from '@/components';
 import { useAuth }  from '@/store/auth';
-import { useAlert } from '@/store/alert';
+import { useAlert, showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 export default function RoleChoiceScreen() {
   const chooseRole = useAuth((s) => s.chooseRole);
@@ -21,14 +22,14 @@ export default function RoleChoiceScreen() {
 
   const onContinue = () => {
     if (!picked) return;
-    Alert.alert(
-      'Dikkat',
+    showAlert(
+      t('auth.roleChoice.alertTitle'),
       picked === 'student'
-        ? 'Öğrenci olarak devam ediyorsun. Bu seçim DAİMİDİR ve sonra değiştirilemez.'
-        : 'Öğretmen olarak devam ediyorsun. Bu seçim DAİMİDİR ve sonra değiştirilemez.',
+        ? t('auth.roleChoice.alertStudent')
+        : t('auth.roleChoice.alertTeacher'),
       [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: 'Onaylıyorum', onPress: () => mutation.mutate(picked) },
+        { text: t('app.cancel'), style: 'cancel' },
+        { text: t('auth.roleChoice.confirmBtn'), onPress: () => mutation.mutate(picked) },
       ],
     );
   };
@@ -37,10 +38,8 @@ export default function RoleChoiceScreen() {
     <Screen>
       <View style={styles.hero}>
         <Text style={styles.emoji}>👋</Text>
-        <Text style={styles.title}>Sen kimsin?</Text>
-        <Text style={styles.subtitle}>
-          Bu seçim daimi olduğu için lütfen dikkatli ol.
-        </Text>
+        <Text style={styles.title}>{t('auth.roleChoice.title')}</Text>
+        <Text style={styles.subtitle}>{t('auth.roleChoice.subtitle')}</Text>
       </View>
 
       <Pressable
@@ -49,8 +48,8 @@ export default function RoleChoiceScreen() {
       >
         <Text style={styles.cardEmoji}>🧒</Text>
         <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>Öğrenciyim</Text>
-          <Text style={styles.cardDesc}>Türkçe okumayı eğlenerek öğreneceğim.</Text>
+          <Text style={styles.cardTitle}>{t('auth.roleChoice.studentTitle')}</Text>
+          <Text style={styles.cardDesc}>{t('auth.roleChoice.studentDesc')}</Text>
         </View>
         {picked === 'student' && <Ionicons name="checkmark-circle" size={24} color={theme.colors.feedback.success} />}
       </Pressable>
@@ -61,24 +60,21 @@ export default function RoleChoiceScreen() {
       >
         <Text style={styles.cardEmoji}>👩‍🏫</Text>
         <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>Öğretmenim</Text>
-          <Text style={styles.cardDesc}>Öğrencilerimi takip edeceğim, ödev göndereceğim.</Text>
+          <Text style={styles.cardTitle}>{t('auth.roleChoice.teacherTitle')}</Text>
+          <Text style={styles.cardDesc}>{t('auth.roleChoice.teacherDesc')}</Text>
         </View>
         {picked === 'teacher' && <Ionicons name="checkmark-circle" size={24} color={theme.colors.feedback.success} />}
       </Pressable>
 
       <View style={styles.warning}>
         <Ionicons name="warning-outline" size={18} color={theme.colors.feedback.warningText} />
-        <Text style={styles.warningText}>
-          Seçimini bir kez yaptığında değiştiremezsin. Aynı e-posta ile farklı bir rol için
-          yeni hesap açamazsın.
-        </Text>
+        <Text style={styles.warningText}>{t('auth.roleChoice.warningText')}</Text>
       </View>
 
       <ErrorBanner message={alert.error?.message ?? ''} />
 
       <Button
-        label="Devam Et"
+        label={t('auth.roleChoice.continueBtn')}
         variant="cta"
         size="lg"
         fullWidth

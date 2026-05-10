@@ -38,9 +38,9 @@ export default function LearnTab() {
     }
     if (isModuleLevelLocked(tier, m, studentLevel)) {
       showAlert(
-        'Seviye Yetersiz',
-        `"${m.title}" oyununu açmak için Seviye ${m.level}'e ulaşman gerekiyor. Şu anki seviyenin: ${studentLevel}.`,
-        [{ text: 'Tamam', style: 'cancel' }],
+        t('levelLock.title'),
+        t('levelLock.message', { title: m.title, level: m.level, current: studentLevel }),
+        [{ text: t('app.ok'), style: 'cancel' }],
       );
       return;
     }
@@ -56,7 +56,7 @@ export default function LearnTab() {
         ListHeaderComponent={
           <View style={styles.header}>
             <Text style={styles.title}>{t('learn.title') ?? 'Öğren'}</Text>
-            <Text style={styles.subtitle}>Bir oyun seç ve oynamaya başla.</Text>
+            <Text style={styles.subtitle}>{t('learn.subtitle')}</Text>
           </View>
         }
         renderItem={({ item: m }) => {

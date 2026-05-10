@@ -14,6 +14,7 @@ import {
 import { useAuth } from '@/store/auth';
 import { getAccessTier, isModuleLocked } from '@/lib/access-tier';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 export default function CategoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,7 +36,7 @@ export default function CategoryScreen() {
           setWords(ws);
         }
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : 'Yüklenemedi');
+        setError(e instanceof Error ? e.message : t('app.error'));
       }
     })();
   }, [id]);
@@ -44,7 +45,7 @@ export default function CategoryScreen() {
     return (
       <Screen>
         <Text style={styles.error}>{error}</Text>
-        <Button label="Geri" variant="secondary" onPress={() => router.back()} />
+        <Button label={t('app.back')} variant="secondary" onPress={() => router.back()} />
       </Screen>
     );
   }
@@ -80,12 +81,12 @@ export default function CategoryScreen() {
               <View style={{ flex: 1, marginLeft: theme.spacing[4] }}>
                 <Text style={styles.heroTitle}>{category.name}</Text>
                 <Text style={styles.heroMeta}>
-                  {words.length} kelime · {modules.length} oyun
+                  {t('learn.categoryMeta', { words: words.length, modules: modules.length })}
                 </Text>
               </View>
             </View>
 
-            <Text style={styles.sectionTitle}>Bir oyun seç</Text>
+            <Text style={styles.sectionTitle}>{t('learn.chooseModuleTitle')}</Text>
           </View>
         }
         renderItem={({ item: m }) => {
@@ -102,7 +103,7 @@ export default function CategoryScreen() {
                   <Text style={styles.moduleDesc} numberOfLines={2}>{m.description}</Text>
                 ) : null}
                 <View style={styles.moduleMeta}>
-                  <Badge label={`Sv ${m.level}`} variant="info" />
+                  <Badge label={t('learn.levelBadge', { level: m.level })} variant="info" />
                   {locked ? <Badge label="🔒 Pro" variant="warning" /> : null}
                 </View>
               </View>

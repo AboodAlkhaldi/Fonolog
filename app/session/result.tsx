@@ -76,7 +76,7 @@ export default function SessionResultScreen() {
         />
         <Stat
           icon="time-outline"
-          label="Süre"
+          label={t('results.time')}
           value={t('results.duration', { seconds: durationS })}
         />
       </View>

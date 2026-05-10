@@ -2,12 +2,16 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AdminPreviewBanner } from '@/components/common/AdminPreviewBanner';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  const tabBarPaddingBottom = Math.max(insets.bottom, 8);
+
   return (
     <View style={{ flex: 1 }}>
       <AdminPreviewBanner />
@@ -24,9 +28,9 @@ export default function TabsLayout() {
             backgroundColor: theme.colors.background.secondary,
             borderTopColor:  theme.colors.border.subtle,
             borderTopWidth:  1,
-            height:          64,
+            height:          56 + tabBarPaddingBottom,
             paddingTop:      6,
-            paddingBottom:   8,
+            paddingBottom:   tabBarPaddingBottom,
           },
         }}
       >

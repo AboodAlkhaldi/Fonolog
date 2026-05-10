@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen, Loading } from '@/components';
 import { useNotifications } from '@/hooks/useNotifications';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 import type { NotificationRow } from '@/lib/database.types';
 
 const TYPE_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -35,12 +36,12 @@ function formatTime(iso: string): string {
   const d = new Date(iso);
   const ms = Date.now() - d.getTime();
   const m = Math.floor(ms / 60000);
-  if (m < 1)   return 'Şimdi';
-  if (m < 60)  return `${m} dk önce`;
+  if (m < 1)   return t('notifications.timeNow');
+  if (m < 60)  return t('notifications.timeMinutes', { m });
   const h = Math.floor(m / 60);
-  if (h < 24)  return `${h} saat önce`;
+  if (h < 24)  return t('notifications.timeHours', { h });
   const days = Math.floor(h / 24);
-  if (days < 7) return `${days} gün önce`;
+  if (days < 7) return t('notifications.timeDays', { d: days });
   return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
 }
 
@@ -68,10 +69,10 @@ export default function NotificationsScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
           <Ionicons name="chevron-back" size={28} color={theme.colors.text.primary} />
         </Pressable>
-        <Text style={styles.title}>Bildirimler</Text>
+        <Text style={styles.title}>{t('notifications.title')}</Text>
         {unreadCount > 0 ? (
           <Pressable onPress={markAllRead} hitSlop={8}>
-            <Text style={styles.markAll}>Tümünü oku</Text>
+            <Text style={styles.markAll}>{t('notifications.markAllRead')}</Text>
           </Pressable>
         ) : <View style={{ width: 60 }} />}
       </View>
@@ -83,10 +84,8 @@ export default function NotificationsScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyEmoji}>📭</Text>
-            <Text style={styles.emptyTitle}>Bildirim yok</Text>
-            <Text style={styles.emptyText}>
-              Yeni ödevler, mesajlar ve hatırlatmalar burada görünecek.
-            </Text>
+            <Text style={styles.emptyTitle}>{t('notifications.emptyTitle')}</Text>
+            <Text style={styles.emptyText}>{t('notifications.emptyText')}</Text>
           </View>
         }
         contentContainerStyle={notifications.length === 0 ? { flex: 1 } : { paddingBottom: theme.spacing[4] }}

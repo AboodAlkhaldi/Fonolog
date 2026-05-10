@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 
 import { Screen, Button, Input, ErrorBanner } from '@/components';
 import { useAuth }  from '@/store/auth';
-import { useAlert } from '@/store/alert';
+import { useAlert, showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 export default function TeacherSignup() {
   const saveTeacherInfo = useAuth((s) => s.saveTeacherInfo);
@@ -29,7 +30,7 @@ export default function TeacherSignup() {
 
   const onSubmit = () => {
     if (!schoolName || !plannedStudents || !teacherAge || !plannedPlan) {
-      Alert.alert('Eksik', 'Tüm alanları doldur.');
+      showAlert(t('teacher.assignment.incompleteTitle'), t('teacher.assignment.incompleteMsg'));
       return;
     }
     alert.clearAlert();
@@ -39,57 +40,54 @@ export default function TeacherSignup() {
   return (
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Öğretmen Bilgilerin</Text>
-        <Text style={styles.subtitle}>
-          7 günlük ücretsiz deneme. Deneme sürecinde 1 öğrenci ekleyebilir, günde 20 dk
-          öğrenci görünümünü test edebilirsin.
-        </Text>
+        <Text style={styles.title}>{t('auth.teacherSignup.title')}</Text>
+        <Text style={styles.subtitle}>{t('auth.teacherSignup.subtitle')}</Text>
 
         <Input
-          label="Okul / Kurum Adı"
+          label={t('auth.teacherSignup.schoolLabel')}
           value={schoolName}
           onChangeText={setSchoolName}
-          placeholder="ör: Villa Akademia"
+          placeholder={t('auth.teacherSignup.schoolPh')}
         />
 
         <Input
-          label="Kaç çocuğa öğretmeyi planlıyorsun?"
+          label={t('auth.teacherSignup.studentsLabel')}
           value={plannedStudents}
           onChangeText={setPlannedStudents}
-          placeholder="ör: 5"
+          placeholder={t('auth.teacherSignup.studentsPh')}
           keyboardType="numeric"
         />
 
         <Input
-          label="Yaşın"
+          label={t('auth.teacherSignup.ageLabel')}
           value={teacherAge}
           onChangeText={setTeacherAge}
           keyboardType="numeric"
         />
 
-        <Text style={styles.label}>Abonelik Planı</Text>
+        <Text style={styles.label}>{t('auth.teacherSignup.planLabel')}</Text>
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: theme.spacing[4] }}>
           <Pressable
             style={[styles.planCard, plannedPlan === 'monthly' && styles.planCardActive]}
             onPress={() => setPlannedPlan('monthly')}
           >
-            <Text style={styles.planTitle}>Aylık</Text>
+            <Text style={styles.planTitle}>{t('auth.teacherSignup.planMonthly')}</Text>
             <Text style={styles.planPrice}>₺399 / ay</Text>
           </Pressable>
           <Pressable
             style={[styles.planCard, plannedPlan === 'yearly' && styles.planCardActive]}
             onPress={() => setPlannedPlan('yearly')}
           >
-            <Text style={styles.planTitle}>Yıllık</Text>
+            <Text style={styles.planTitle}>{t('auth.teacherSignup.planYearly')}</Text>
             <Text style={styles.planPrice}>₺2.399 / yıl</Text>
-            <Text style={styles.planSavings}>2 ay bedava</Text>
+            <Text style={styles.planSavings}>{t('auth.teacherSignup.planSavings')}</Text>
           </Pressable>
         </View>
 
         <ErrorBanner message={alert.error?.message ?? ''} />
 
         <Button
-          label="Kaydet ve Devam Et"
+          label={t('auth.teacherSignup.submitBtn')}
           variant="cta"
           size="lg"
           fullWidth

@@ -68,19 +68,19 @@ export default function HomeTab() {
           <View style={{ flex: 1 }}>
             <Text style={styles.trialTitle}>
               {trialDays === 0
-                ? 'Deneme bugün bitiyor!'
-                : `Deneme süreci: ${trialDays} gün kaldı`}
+                ? t('home.trialEndingToday')
+                : t('home.trialDaysLeft', { days: trialDays })}
             </Text>
           </View>
-          <Button label="Yükselt" variant="primary" size="md" onPress={() => router.push('/paywall')} />
+          <Button label={t('home.upgradeBtn')} variant="primary" size="md" onPress={() => router.push('/paywall')} />
         </View>
       ) : tier === 'free' ? (
         <View style={styles.trialBanner}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.trialTitle}>Ücretsiz Plan</Text>
-            <Text style={styles.trialSubtitle}>Sınırlı erişim · Hazırlık modülleri</Text>
+            <Text style={styles.trialTitle}>{t('home.freePlan')}</Text>
+            <Text style={styles.trialSubtitle}>{t('home.limitedAccess')}</Text>
           </View>
-          <Button label="Yükselt" variant="primary" size="md" onPress={() => router.push('/paywall')} />
+          <Button label={t('home.upgradeBtn')} variant="primary" size="md" onPress={() => router.push('/paywall')} />
         </View>
       ) : null}
 
@@ -91,7 +91,7 @@ export default function HomeTab() {
           fallbackEmoji={profile.child_avatar_emoji ?? '🦁'}
         />
         <View style={{ flex: 1, marginLeft: theme.spacing[4] }}>
-          <Text style={styles.greeting}>Merhaba, {childName}!</Text>
+          <Text style={styles.greeting}>{t('home.greeting', { name: childName })}</Text>
           <View style={styles.badgeRow}>
             <Badge label={`Sv ${level}`} variant="info" />
             <View style={{ width: 8 }} />
@@ -107,10 +107,10 @@ export default function HomeTab() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Bugünün Dersi</Text>
-        <Text style={styles.cardSubtitle}>Hızlı bir tanıma turu başlayalım.</Text>
+        <Text style={styles.cardTitle}>{t('home.todaysLesson')}</Text>
+        <Text style={styles.cardSubtitle}>{t('home.todaysLessonSubtitle')}</Text>
         <Button
-          label="Devam Et"
+          label={t('home.continueBtn')}
           variant="cta" size="lg" fullWidth
           onPress={() => router.push('/session/tani')}
           style={{ marginTop: theme.spacing[4] }}
@@ -120,10 +120,10 @@ export default function HomeTab() {
       <View style={{ height: theme.spacing[3] }} />
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Tüm Oyunlar</Text>
-        <Text style={styles.cardSubtitle}>Bir oyun seç ve oynamaya başla.</Text>
+        <Text style={styles.cardTitle}>{t('home.allGames')}</Text>
+        <Text style={styles.cardSubtitle}>{t('home.allGamesSubtitle')}</Text>
         <Button
-          label="Öğren'e Git"
+          label={t('home.goToLearn')}
           variant="secondary" size="lg" fullWidth
           onPress={() => router.push('/(tabs)/learn')}
           style={{ marginTop: theme.spacing[4] }}

@@ -56,7 +56,7 @@ function useProtectedRoute(status: AuthStatus, role: string | null, impersonatin
     const root = segments[0];
 
     switch (status) {
-      case 'unauthenticated':
+      case 'unauthenticated': 
         if (root !== '(auth)') router.replace('/(auth)/welcome');
         return;
 
@@ -76,18 +76,22 @@ function useProtectedRoute(status: AuthStatus, role: string | null, impersonatin
         if (root !== '(onboarding)') router.replace('/(onboarding)/child-age');
         return;
 
+      case 'needsPasswordReset':
+        if (root !== 'reset-password') router.replace('/reset-password');
+        return;
+
       case 'authenticated':
         if (role === 'admin' && !impersonating) {
-          const validRoots = ['admin', 'paywall', 'notifications', 'settings'];
+          const validRoots = ['admin', 'paywall', 'notifications', 'settings', 'reset-password'];
           if (!validRoots.includes(root ?? '')) router.replace('/admin');
         } else if (role === 'teacher' && !impersonating) {
-          const validRoots = ['teacher', 'paywall', 'notifications', 'settings'];
+          const validRoots = ['teacher', 'paywall', 'notifications', 'settings', 'reset-password'];
           if (!validRoots.includes(root ?? '')) router.replace('/teacher');
         } else if (impersonating === 'teacher') {
-          const validRoots = ['teacher', 'admin', 'paywall', 'notifications', 'settings'];
+          const validRoots = ['teacher', 'admin', 'paywall', 'notifications', 'settings', 'reset-password'];
           if (!validRoots.includes(root ?? '')) router.replace('/teacher');
         } else {
-          const validRoots = ['(tabs)', 'session', 'learn', 'paywall', 'admin', 'notifications', 'settings'];
+          const validRoots = ['(tabs)', 'session', 'learn', 'paywall', 'admin', 'notifications', 'settings', 'reset-password'];
           if (!validRoots.includes(root ?? '')) router.replace('/(tabs)');
         }
         return;
@@ -153,8 +157,9 @@ export default function RootLayout() {
             <Stack.Screen name="session"       options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="learn"         />
             <Stack.Screen name="paywall"       options={{ presentation: 'modal' }} />
-            <Stack.Screen name="notifications" />
-            <Stack.Screen name="settings"      />
+            <Stack.Screen name="notifications"   />
+            <Stack.Screen name="settings"        />
+            <Stack.Screen name="reset-password"  options={{ animation: 'slide_from_bottom' }} />
           </Stack>
         </QueryClientProvider>
       </SafeAreaProvider>

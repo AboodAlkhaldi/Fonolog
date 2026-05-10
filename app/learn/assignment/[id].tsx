@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { useSession } from '@/store/session';
 import { getModule } from '@/domain';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 interface Assignment {
   id:           string;
@@ -85,16 +86,16 @@ export default function AssignmentDetail() {
           <Text style={styles.emoji}>📋</Text>
           <Text style={styles.title}>{assignment.title}</Text>
           {isCompleted ? (
-            <Badge label="Tamamlandı ✓" variant="success" />
+            <Badge label={t('learn.assignment.completed')} variant="success" />
           ) : (
-            <Badge label="Beklemede" variant="warning" />
+            <Badge label={t('learn.assignment.pending')} variant="warning" />
           )}
         </View>
 
         {teacher ? (
           <View style={styles.teacherRow}>
             <Text style={{ fontSize: 22 }}>{teacher.child_avatar_emoji ?? '👩‍🏫'}</Text>
-            <Text style={styles.teacherName}>Öğretmenin: {teacher.full_name ?? '—'}</Text>
+            <Text style={styles.teacherName}>{t('learn.assignment.teacher', { name: teacher.full_name ?? '—' })}</Text>
           </View>
         ) : null}
 
@@ -102,13 +103,13 @@ export default function AssignmentDetail() {
           <View style={styles.messageCard}>
             <Ionicons name="chatbubble-outline" size={18} color={theme.colors.brand.secondaryHover} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.messageLabel}>Öğretmenden mesaj</Text>
+              <Text style={styles.messageLabel}>{t('learn.assignment.messageLabel')}</Text>
               <Text style={styles.messageBody}>{assignment.instructions}</Text>
             </View>
           </View>
         ) : null}
 
-        <Text style={styles.section}>Oyunlar ({modules.length})</Text>
+        <Text style={styles.section}>{t('learn.assignment.modules', { count: modules.length })}</Text>
 
         {modules.map((m) => {
           const selected = pickedModuleId === m.id;
@@ -131,7 +132,7 @@ export default function AssignmentDetail() {
         })}
 
         <Button
-          label={isCompleted ? 'Tekrar Oyna' : 'Başla'}
+          label={isCompleted ? t('results.playAgain') : t('learn.assignment.startBtn')}
           variant="cta"
           size="lg"
           fullWidth

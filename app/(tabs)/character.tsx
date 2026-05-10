@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, FlatList, Alert } from 'react-native';
+import { View, Text, Pressable, StyleSheet, FlatList } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -7,7 +7,12 @@ import { Screen, Loading, Badge } from '@/components';
 import { CharacterRenderer } from '@/components/character/CharacterRenderer';
 import { useAuth } from '@/store/auth';
 import { supabase } from '@/lib/supabase';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
+
+const placeholderEmoji = (url: string, fallback = '✨') =>
+  url.startsWith('placeholder://') ? (url.slice(14) || fallback) : fallback;
 
 interface BaseChar { id: string; name: string; asset_url: string; asset_type: 'svg'|'png'|'lottie'; unlock_xp: number }
 interface Extra    { id: string; name: string; asset_url: string; asset_type: 'svg'|'png'|'lottie'; category_id: string; rarity: string; unlock_xp: number }
@@ -95,7 +100,7 @@ export default function CharacterTab() {
       if ((c.data ?? []).length > 0 && !activeCat) setActiveCat(c.data![0].id);
       setLoading(false);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Karakter yüklenemedi.');
+      setError(e instanceof Error ? e.message : t('character.loadError'));
       setLoading(false);
     }
   }, [profile?.id, impersonating]);
@@ -106,7 +111,7 @@ export default function CharacterTab() {
   if (error) {
     return (
       <Screen>
-        <Text style={styles.title}>Karakter</Text>
+        <Text style={styles.title}>{t('character.title')}</Text>
         <Text style={[styles.tileHint, { textAlign: 'center', marginTop: 24 }]}>{error}</Text>
       </Screen>
     );
@@ -114,9 +119,9 @@ export default function CharacterTab() {
   if (!character) {
     return (
       <Screen>
-        <Text style={styles.title}>Karakter</Text>
+        <Text style={styles.title}>{t('character.title')}</Text>
         <Text style={[styles.tileHint, { textAlign: 'center', marginTop: 24 }]}>
-          Karakter bilgileri henüz hazır değil. Birkaç saniye sonra tekrar dene.
+          {t('character.notReady')}
         </Text>
       </Screen>
     );
@@ -124,21 +129,22 @@ export default function CharacterTab() {
 
   const equipBase = async (id: string) => {
     if (character.total_xp < (bases.find((b) => b.id === id)?.unlock_xp ?? 0)) {
-      Alert.alert('Henüz açılmadı', 'Daha çok XP kazan!');
+      showAlert(bases.find((b) => b.id === id)?.name ?? '', t('character.lockedMsg'));
       return;
     }
-    await supabase.from('student_character').update({ base_character_id: id } as any).eq('student_id', profile!.id);
-    load();
+    const { error } = await supabase.from('student_character').update({ base_character_id: id } as any).eq('student_id', profile!.id);
+    if (error) { showAlert(t('app.error_title'), error.message); return; }
+    setCharacter((prev) => prev ? { ...prev, base_character_id: id } : prev);
   };
 
   const equipExtra = async (extra: Extra) => {
     if (character.total_xp < extra.unlock_xp) {
-      Alert.alert('Henüz açılmadı', `${extra.unlock_xp} XP gerekiyor.`);
+      showAlert(extra.name, t('character.unlockRequired', { xp: extra.unlock_xp }));
       return;
     }
     const { error } = await supabase.rpc('equip_item', { p_item_id: extra.id });
-    if (error) { Alert.alert('Hata', error.message); return; }
-    load();
+    if (error) { showAlert(t('app.error_title'), error.message); return; }
+    await load();
   };
 
   const baseDef = bases.find((b) => b.id === character.base_character_id) ?? null;
@@ -154,29 +160,32 @@ export default function CharacterTab() {
 
   return (
     <Screen scroll={false}>
-      <Text style={styles.title}>Karakter</Text>
+      <Text style={styles.title}>{t('character.title')}</Text>
 
-      <View style={styles.previewRow}>
+      <View style={styles.previewCard}>
         <CharacterRenderer
           base={baseDef ? { id: baseDef.id, asset_url: baseDef.asset_url, asset_type: baseDef.asset_type } : null}
           extras={equippedExtras.map((e) => e ? { id: e.id, asset_url: e.asset_url, asset_type: e.asset_type } : null)}
-          size={140}
+          size={120}
           fallbackEmoji={profile?.child_avatar_emoji ?? '🦁'}
         />
         <View style={styles.statsCol}>
-          <Badge label={`Sv ${character.level}`} variant="info" />
-          <Badge label={`${character.total_xp} XP`} variant="success" />
-          <Badge label={`🔥 ${character.current_streak}`} variant="warning" />
+          <Text style={styles.characterName}>{profile?.full_name?.split(' ')[0] ?? 'Kahraman'}</Text>
+          <View style={styles.badgeRow}>
+            <Badge label={`Sv ${character.level}`} variant="info" />
+            <Badge label={`${character.total_xp} XP`} variant="success" />
+          </View>
+          <Badge label={t('character.streakLabel', { count: character.current_streak })} variant="warning" />
         </View>
       </View>
 
       {/* Tab switcher */}
       <View style={styles.tabs}>
         <Pressable onPress={() => setTab('base')} style={[styles.tabBtn, tab === 'base' && styles.tabBtnActive]}>
-          <Text style={[styles.tabText, tab === 'base' && styles.tabTextActive]}>Karakterler</Text>
+          <Text style={[styles.tabText, tab === 'base' && styles.tabTextActive]}>{t('character.tabBase')}</Text>
         </Pressable>
         <Pressable onPress={() => setTab('extras')} style={[styles.tabBtn, tab === 'extras' && styles.tabBtnActive]}>
-          <Text style={[styles.tabText, tab === 'extras' && styles.tabTextActive]}>Aksesuarlar</Text>
+          <Text style={[styles.tabText, tab === 'extras' && styles.tabTextActive]}>{t('character.tabExtras')}</Text>
         </Pressable>
       </View>
 
@@ -191,13 +200,13 @@ export default function CharacterTab() {
             const equipped = item.id === character.base_character_id;
             return (
               <Pressable
-                onPress={() => unlocked ? equipBase(item.id) : Alert.alert(item.name, `${item.unlock_xp} XP'de açılır`)}
+                onPress={() => unlocked ? equipBase(item.id) : showAlert(item.name, t('character.unlockAt', { xp: item.unlock_xp }))}
                 style={[styles.tile, equipped && styles.tileEquipped, !unlocked && styles.tileLocked]}
               >
                 <CharacterRenderer
                   base={{ id: item.id, asset_url: item.asset_url, asset_type: item.asset_type }}
                   size={64}
-                  fallbackEmoji="🦁"
+                  fallbackEmoji={placeholderEmoji(item.asset_url, '🦁')}
                 />
                 <Text style={styles.tileName} numberOfLines={1}>{item.name}</Text>
                 {!unlocked ? <Text style={styles.tileHint}>🔒 {item.unlock_xp}</Text> :
@@ -238,14 +247,14 @@ export default function CharacterTab() {
                 || item.id === character.equipped_bg;
               return (
                 <Pressable
-                  onPress={() => unlocked ? equipExtra(item) : Alert.alert(item.name, `${item.unlock_xp} XP'de açılır`)}
+                  onPress={() => unlocked ? equipExtra(item) : showAlert(item.name, t('character.unlockRequired', { xp: item.unlock_xp }))}
                   style={[styles.tile, equipped && styles.tileEquipped, !unlocked && styles.tileLocked]}
                 >
                   <CharacterRenderer
                     base={null}
                     extras={[{ id: item.id, asset_url: item.asset_url, asset_type: item.asset_type }]}
                     size={56}
-                    fallbackEmoji="✨"
+                    fallbackEmoji={placeholderEmoji(item.asset_url, '✨')}
                   />
                   <Text style={styles.tileName} numberOfLines={1}>{item.name}</Text>
                   {!unlocked ? <Text style={styles.tileHint}>🔒 {item.unlock_xp}</Text> :
@@ -262,9 +271,20 @@ export default function CharacterTab() {
 }
 
 const styles = StyleSheet.create({
-  title: { ...theme.typography.h1, color: theme.colors.text.primary },
-  previewRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[4], paddingVertical: theme.spacing[4] },
-  statsCol: { flex: 1, gap: theme.spacing[2] },
+  title: { ...theme.typography.h1, color: theme.colors.text.primary, marginBottom: theme.spacing[3] },
+  previewCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[4],
+    backgroundColor: theme.colors.background.secondary,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing[4],
+    marginBottom: theme.spacing[4],
+    ...theme.shadow.sm,
+  },
+  characterName: { ...theme.typography.h4, color: theme.colors.text.primary, marginBottom: theme.spacing[2] },
+  badgeRow: { flexDirection: 'row', gap: theme.spacing[2], marginBottom: theme.spacing[2] },
+  statsCol: { flex: 1, gap: theme.spacing[1] },
   tabs: { flexDirection: 'row', gap: theme.spacing[2], marginBottom: theme.spacing[3] },
   tabBtn: {
     flex: 1, paddingVertical: theme.spacing[2],
