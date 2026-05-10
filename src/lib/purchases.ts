@@ -62,6 +62,19 @@ export async function purchasePackage(pkg: PurchasesPackage): Promise<CustomerIn
   const { customerInfo } = await Purchases.purchasePackage(pkg);
   await syncSubscriptionToServer();
   await useAuth.getState().refreshProfile();
+
+  // Immediate in-app notification (webhook will send the email, which may arrive slightly later)
+  const userId = useAuth.getState().user?.id;
+  if (userId) {
+    void supabase.from('notifications').insert({
+      user_id: userId,
+      type: 'subscription_expiring' as any,
+      title: 'Pro üyeliğin başladı! 🎉',
+      body: 'Tüm içeriklere erişebilirsin. İyi okumalar!',
+      payload: { product_id: pkg.product.identifier },
+    } as any);
+  }
+
   return customerInfo;
 }
 

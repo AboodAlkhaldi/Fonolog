@@ -30,6 +30,12 @@ interface Props {
  * For MVP: we ship with `placeholder://` urls in the DB and emoji fallback
  * displays a colored circle with initial letter. Admin upload replaces them.
  */
+function emojiFromUrl(url?: string, fallback = '🦁') {
+  if (!url || !url.startsWith('placeholder://')) return fallback;
+  const extracted = url.slice('placeholder://'.length);
+  return extracted || fallback;
+}
+
 export function CharacterRenderer({
   base, extras = [], size = 140, fallbackEmoji = '🦁',
 }: Props) {
@@ -37,10 +43,11 @@ export function CharacterRenderer({
 
   // Until real assets are uploaded: render emoji fallback.
   if (!base || isPlaceholder(base.asset_url)) {
+    const emoji = base ? emojiFromUrl(base.asset_url, fallbackEmoji) : fallbackEmoji;
     return (
       <View style={[styles.placeholderWrap, { width: size, height: size, borderRadius: size / 2 }]}>
         <Text style={[styles.placeholderEmoji, { fontSize: size * 0.55 }]}>
-          {fallbackEmoji}
+          {emoji}
         </Text>
       </View>
     );

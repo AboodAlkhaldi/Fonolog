@@ -26,6 +26,7 @@ export type AuthStatus =
   | 'needsRoleChoice'
   | 'needsOnboarding'
   | 'needsTeacherSignup'
+  | 'needsPasswordReset'
   | 'authenticated';
 
 export type Profile = ProfileRow;
@@ -39,30 +40,31 @@ interface AuthState {
   /** When admin is previewing student/teacher view, this holds the original profile. */
   impersonating: 'student' | 'teacher' | null;
 
-  initialize:         () => Promise<void>;
-  signUp:             (email: string, password: string, fullName: string) => Promise<void>;
-  signIn:             (email: string, password: string) => Promise<void>;
-  signOut:            () => Promise<void>;
-  resendVerification: () => Promise<void>;
-  refreshProfile:     () => Promise<void>;
+  initialize:           () => Promise<void>;
+  signUp:               (email: string, password: string, fullName: string) => Promise<void>;
+  signIn:               (email: string, password: string) => Promise<void>;
+  signOut:              () => Promise<void>;
+  resendVerification:   () => Promise<void>;
+  refreshProfile:       () => Promise<void>;
+  deactivateAccount:    () => Promise<void>;
 
   /** Set role at first time. Cannot be undone (DB trigger enforces). */
-  chooseRole:         (role: 'student' | 'teacher') => Promise<void>;
+  chooseRole:           (role: 'student' | 'teacher') => Promise<void>;
 
   /** Save child age/avatar (student only). */
-  saveChildInfo:      (age: number, avatarEmoji: string) => Promise<void>;
+  saveChildInfo:        (age: number, avatarEmoji: string) => Promise<void>;
 
   /** Save teacher signup fields (teacher only). */
-  saveTeacherInfo:    (data: {
-                          schoolName?: string;
-                          plannedStudents?: number;
-                          teacherAge?: number;
-                          plannedPlan?: 'monthly' | 'yearly';
-                        }) => Promise<void>;
+  saveTeacherInfo:      (data: {
+                            schoolName?: string;
+                            plannedStudents?: number;
+                            teacherAge?: number;
+                            plannedPlan?: 'monthly' | 'yearly';
+                          }) => Promise<void>;
 
   /** Admin preview controls. */
-  startImpersonation: (kind: 'student' | 'teacher') => void;
-  stopImpersonation:  () => void;
+  startImpersonation:   (kind: 'student' | 'teacher') => void;
+  stopImpersonation:    () => void;
 }
 
 function deriveStatus(session: Session | null, profile: Profile | null): AuthStatus {
@@ -114,7 +116,13 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ status: 'unauthenticated', session: null, user: null, profile: null });
     }
 
-    supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    supabase.auth.onAuthStateChange(async (event, newSession) => {
+      // Password recovery deep link → route to reset-password page.
+      if (event === 'PASSWORD_RECOVERY') {
+        set({ status: 'needsPasswordReset', session: newSession, user: newSession?.user ?? null });
+        return;
+      }
+
       try {
         let p: Profile | null = null;
         if (newSession?.user) {
@@ -125,6 +133,17 @@ export const useAuth = create<AuthState>((set, get) => ({
             .maybeSingle();
           p = (data as Profile) ?? null;
         }
+
+        // If a deactivated account just confirmed their email (re-registration),
+        // reactivate it so they continue from where they left off.
+        if (event === 'SIGNED_IN' && p && (p as any).is_active === false) {
+          await supabase
+            .from('profiles')
+            .update({ is_active: true } as any)
+            .eq('id', newSession!.user.id);
+          p = { ...p, is_active: true } as any;
+        }
+
         const derived = deriveStatus(newSession, p);
         set({
           session: newSession,
@@ -145,6 +164,13 @@ export const useAuth = create<AuthState>((set, get) => ({
       options: { data: { full_name: fullName } },
     });
     if (error) throw new AppError(error.message);
+
+    // Supabase returns success with empty identities when the email is already
+    // registered AND confirmed (security by obfuscation). Surface a real error.
+    if (data.user?.identities?.length === 0) {
+      throw new AppError('Bu e-posta adresi zaten kullanılıyor.');
+    }
+
     if (data.session) {
       set({ session: data.session, user: data.user, status: 'awaitingEmailVerify' });
     }
@@ -154,8 +180,6 @@ export const useAuth = create<AuthState>((set, get) => ({
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new AppError(error.message);
 
-    // Fetch profile immediately so navigation happens synchronously
-    // instead of waiting for onAuthStateChange (which can silently stall).
     let profile: Profile | null = null;
     if (data.session?.user) {
       const { data: row, error: profileError } = await supabase
@@ -172,6 +196,12 @@ export const useAuth = create<AuthState>((set, get) => ({
       profile = (row as Profile) ?? null;
     }
 
+    // Block deactivated accounts from signing in with password.
+    if (profile && (profile as any).is_active === false) {
+      await supabase.auth.signOut();
+      throw new AppError('Bu hesap devre dışı bırakıldı. Yeniden kayıt olarak hesabınızı geri yükleyebilirsiniz.');
+    }
+
     const derived = deriveStatus(data.session, profile);
     set({
       session: data.session,
@@ -179,6 +209,15 @@ export const useAuth = create<AuthState>((set, get) => ({
       profile,
       status: derived === 'loading' ? 'needsRoleChoice' : derived,
     });
+  },
+
+  deactivateAccount: async () => {
+    const { user } = get();
+    if (!user) throw new AppError('Oturum bulunamadı.');
+    const { error } = await supabase.rpc('deactivate_account' as any);
+    if (error) throw new AppError(error.message);
+    await supabase.auth.signOut();
+    set({ status: 'unauthenticated', session: null, user: null, profile: null, impersonating: null });
   },
 
   signOut: async () => {

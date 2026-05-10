@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/store/auth';
 import { setAdminPreviewTier } from '@/lib/access-tier';
 import { supabase } from '@/lib/supabase';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 
 /**
@@ -48,7 +49,7 @@ export function AdminPreviewBanner() {
       const allowed      = row?.allowed ?? true;
       setRemaining(remainingMin);
       if (!allowed) {
-        Alert.alert(
+        showAlert(
           'Süren doldu',
           'Bugünkü 20 dakikalık öğrenci görünümü süreni doldurdun. Yarın tekrar dene.',
           [{ text: 'Tamam', onPress: handleExit }],

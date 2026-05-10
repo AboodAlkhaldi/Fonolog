@@ -3,14 +3,16 @@
  * Auto-syllabifies Turkish, kicks off TTS gen on save.
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Button, Input, Loading } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { contentRepository, type Category } from '@/domain';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 function autoSyllabify(word: string): string[] {
   const VOWELS = new Set('aeıioöuüAEIİOÖUÜ');
@@ -65,7 +67,7 @@ export default function WordEditor() {
 
   const onSubmit = async () => {
     if (!wordText || !emoji || !categoryId) {
-      Alert.alert('Eksik', 'Tüm alanları doldur.');
+      showAlert(t('teacher.assignment.incompleteTitle'), t('teacher.wordEdit.incompleteMsg'));
       return;
     }
     setSubmitting(true);
@@ -84,12 +86,26 @@ export default function WordEditor() {
       is_active: true,
     };
 
-    const result = isNew
-      ? await supabase.from('words').insert(payload).select().single()
-      : await supabase.from('words').update(payload).eq('id', id).select().single();
+    let result: { data: any; error: any };
+    if (isNew) {
+      // Check for a soft-deleted word with the same text+category → reactivate instead of insert
+      const { data: existing } = await supabase
+        .from('words')
+        .select('id')
+        .eq('word_text', wl)
+        .eq('category_id', categoryId)
+        .eq('is_active', false)
+        .maybeSingle();
+
+      result = existing
+        ? await supabase.from('words').update(payload).eq('id', existing.id).select().single()
+        : await supabase.from('words').insert(payload).select().single();
+    } else {
+      result = await supabase.from('words').update(payload).eq('id', id).select().single();
+    }
 
     if (result.error) {
-      Alert.alert('Hata', result.error.message);
+      showAlert(t('app.error_title'), result.error.message);
       setSubmitting(false);
       return;
     }
@@ -114,22 +130,22 @@ export default function WordEditor() {
       <Pressable onPress={() => router.back()} style={styles.back} hitSlop={12}>
         <Ionicons name="chevron-back" size={28} color={theme.colors.text.primary} />
       </Pressable>
-      <Text style={styles.title}>{isNew ? 'Yeni Kelime' : 'Kelime Düzenle'}</Text>
+      <Text style={styles.title}>{isNew ? t('teacher.wordEdit.titleNew') : t('teacher.wordEdit.titleEdit')}</Text>
 
       <ScrollView>
-        <Input label="Kelime" value={wordText} onChangeText={setWordText} autoCapitalize="none" required />
-        <Input label="Emoji"  value={emoji}    onChangeText={setEmoji} required />
+        <Input label={t('teacher.wordEdit.wordLabel')} value={wordText} onChangeText={setWordText} autoCapitalize="none" required />
+        <Input label={t('teacher.wordEdit.emojiLabel')} value={emoji} onChangeText={setEmoji} required />
 
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
           <View style={{ flex: 1 }}>
-            <Input label="Heceler (- ile ayır)" value={syllables} onChangeText={setSyllables}
-                   autoCapitalize="none" helper="ör: ka-lem" />
+            <Input label={t('teacher.wordEdit.syllablesLabel')} value={syllables} onChangeText={setSyllables}
+                   autoCapitalize="none" helper={t('teacher.wordEdit.syllablesHelper')} />
           </View>
-          <Button label="Otomatik" variant="ghost" size="md" onPress={onAuto}
+          <Button label={t('teacher.wordEdit.autoBtn')} variant="ghost" size="md" onPress={onAuto}
                   style={{ marginBottom: 16 }} />
         </View>
 
-        <Text style={styles.label}>Kategori</Text>
+        <Text style={styles.label}>{t('teacher.wordEdit.categoryLabel')}</Text>
         <View style={styles.catGrid}>
           {cats.map((c) => (
             <Pressable
@@ -144,7 +160,7 @@ export default function WordEditor() {
         </View>
 
         <Button
-          label={isNew ? 'Ekle' : 'Kaydet'}
+          label={isNew ? t('teacher.wordEdit.addBtn') : t('teacher.wordEdit.saveBtn')}
           variant="cta" size="lg" fullWidth
           loading={submitting} onPress={onSubmit}
           style={{ marginTop: theme.spacing[5] }}

@@ -50,9 +50,9 @@ export function Screen({
   return (
     <SafeAreaView edges={edges} style={safeAreaStyle}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         {Inner}
       </KeyboardAvoidingView>
