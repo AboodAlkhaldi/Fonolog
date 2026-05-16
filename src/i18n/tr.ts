@@ -1,5 +1,5 @@
 /**
- * Turkish UI strings for Okuma Dedektifi.
+ * Turkish UI strings for Fonolog.
  *
  * Naming: nested by feature → screen → element.
  * Variables: {{name}} interpolation via i18n-js.
@@ -14,7 +14,7 @@
 const tr = {
   // ─── App-level ─────────────────────────────────────
   app: {
-    name:         'Okuma Dedektifi',
+    name:         'Fonolog',
     tagline:      'Türkçe okumayı keşfet!',
     loading:      'Yükleniyor...',
     error:        'Bir şeyler ters gitti.',
@@ -37,7 +37,7 @@ const tr = {
   // ─── Auth ──────────────────────────────────────────
   auth: {
     welcome: {
-      title:        'Okuma Dedektifi\'ne Hoş Geldin!',
+      title:        'Fonolog\'a Hoş Geldin!',
       subtitle:     'Çocuğunuz için Türkçe okuma maceraları.',
       signIn:       'Giriş yap',
       signUp:       'Hesap oluştur',
@@ -212,9 +212,12 @@ const tr = {
 
   // ─── Learn / Session ───────────────────────────────
   learn: {
-    title:          'Öğren',
-    subtitle:       'Bir oyun seç ve oynamaya başla.',
-    chooseCategory: 'Bir oyun seç',
+    title:             'Öğren',
+    subtitle:          'Bir oyun seç ve oynamaya başla.',
+    alwaysOpenSection: 'Daima Açık',
+    dailySection:      'Günlük Oyunlar',
+    todayBadge:        'Bugün',
+    chooseCategory:    'Bir oyun seç',
     assignment: {
       completed:    'Tamamlandı ✓',
       pending:      'Beklemede',
@@ -226,7 +229,6 @@ const tr = {
     categoryBack:   'Geri',
     categoryMeta:   '{{words}} kelime · {{modules}} oyun',
     chooseModuleTitle: 'Bir oyun seç',
-    levelBadge:     'Sv {{level}}',
   },
   session: {
     loading:      'Soru hazırlanıyor...',
@@ -249,12 +251,6 @@ const tr = {
     tabExtras:      'Aksesuarlar',
     unlockAt:       '{{xp}} XP\'de açılır',
     unlockRequired: '{{xp}} XP gerekiyor',
-  },
-
-  // ─── Learn / Level lock ────────────────────────────
-  levelLock: {
-    title:   'Seviye Yetersiz',
-    message: '"{{title}}" oyununu açmak için Seviye {{level}}\'e ulaşman gerekiyor. Şu anki seviyenin: {{current}}.',
   },
 
   // ─── Profile tab (student) ─────────────────────────
@@ -437,10 +433,6 @@ const tr = {
       modulesHint:     'Oyunlar ({{count}} seçildi) · Öğrenci planına göre filtrelendi',
       previewNoStudents: 'Önizleme modunda öğrenci listesi gösterilmez.',
       noStudents:      'Henüz bağlı öğrenci yok.',
-      lockPronunciation: 'Telaffuz — Pro gerektirir',
-      lockLevel:       'Seviye {{level}} — planında yok',
-      lockTitle:       'Kilitli',
-      lockMsg:         'Bu oyun öğrencinin planında açık değil: {{reason}}',
       titleLabel:      'Başlık',
       messageLabel:    'Mesaj (öğrenciye not)',
       messagePh:       'Bu ödevi neden verdiğini ya da ipuçlarını yaz...',
@@ -471,18 +463,22 @@ const tr = {
       noSessions: 'Henüz oturum yok.',
     },
     preview: {
-      title:        'Öğrenci Görünümü',
-      subtitle:     'Öğrencilerinin uygulamayı nasıl deneyimlediğini görmek için bu görünümü test edebilirsin.',
-      cardTitle:    'Öğrenci Modu',
-      cardDesc:     'Tüm modüller, kelimeler ve karakter sistemi sana açık.',
-      cardDescTrial:'Tüm modüller, kelimeler ve karakter sistemi sana açık. (20 dk/gün)',
-      startBtn:     'Görünüme Geç',
-      hint:         'Görünümdeyken üst tarafta sarı bir bant göreceksin. "Çık" butonuyla bu menüye dönebilirsin.',
-      alreadyIn:    'Öğretmen görünümündeyken öğrenci görünümüne geçemezsin. Yönetim paneline dön ve oradan "Öğrenci" sekmesini kullan.',
-      confirmTitle: 'Öğrenci Görünümü',
-      confirmTrial: 'Deneme sürecinde günde 20 dakika öğrenci görünümünü test edebilirsin.',
-      confirmFull:  'Öğrencinin uygulamayı nasıl gördüğünü deneyebilirsin.',
-      startConfirm: 'Başlat',
+      title:           'Öğrenci Görünümü',
+      subtitle:        'Öğrencilerinin uygulamayı nasıl deneyimlediğini görmek için bu görünümü test edebilirsin.',
+      cardTitle:       'Öğrenci Modu',
+      cardDesc:        'Tüm modüller, kelimeler ve karakter sistemi sana açık.',
+      cardDescTrial:   'Tüm modüller, kelimeler ve karakter sistemi sana açık. (20 dk/gün)',
+      startBtn:        'Görünüme Geç',
+      hint:            'Görünümdeyken üst tarafta sarı bir bant göreceksin. "Çık" butonuyla bu menüye dönebilirsin.',
+      alreadyIn:       'Öğretmen görünümündeyken öğrenci görünümüne geçemezsin. Yönetim paneline dön ve oradan "Öğrenci" sekmesini kullan.',
+      confirmTitle:    'Öğrenci Görünümü',
+      confirmTrial:    'Deneme sürecinde günde 20 dakika öğrenci görünümünü test edebilirsin.',
+      confirmFull:     'Öğrencinin uygulamayı nasıl gördüğünü deneyebilirsin.',
+      startConfirm:    'Başlat',
+      dayCardPlaceholder: 'Önizleme modunda öğrenci verileri gösterilmez.',
+      planTitle:       'Önizleme Modu',
+      planMsg:         'Bu önizleme modunda plan bilgisi görüntülenmiyor. Gerçek plan bilgisi için önizlemeden çık.',
+      planDesc:        'Önizleme modunda plan bilgisi yok.',
     },
     words: {
       title:          'Kelimeler ({{count}})',
@@ -508,6 +504,39 @@ const tr = {
       successMsg: 'Öğrenci eklendi.',
       upgradeBtn: "Pro'ya Geç",
     },
+  },
+
+  // ─── Day curriculum (replaces the old level system) ───────────────
+  day: {
+    label:           'Gün {{day}}',
+    progress:        'Bugünün ilerlemesi: {{done}}/{{total}}',
+    continueCta:     'Devam Et',
+    startTodayCta:   "Bugüne Başla",
+    todayAllDone:    'Bugünü bitirdin! 🎉',
+    todayAllDoneSub: 'Şimdi tüm oyunlara erişebilirsin.',
+    gameDone:        'Tamamlandı ✓',
+    locked:          'Önce bugünün oyunlarını bitir.',
+    lockedTitle:     'Kilitli',
+    completeTitle:   'Tebrikler! 🎉',
+    completeMsgPro:  "Bugünün oyunlarını tamamladın. Artık tüm oyunlara erişebilirsin.",
+    completeMsgTrial:"Bugünün oyunlarını tamamladın. Yarınki oyunlar da bugün için açıldı.",
+    completeMsgFree: 'Bugünün oyunlarını tamamladın. Yarın yine görüşürüz!',
+    closeBtn:        'Harika!',
+  },
+
+  // ─── Online / offline gating ──────────────────────────────────────
+  online: {
+    required:      'Bu özelliği kullanmak için çevrimiçi olmalısın.',
+    requiredTitle: 'İnternet Gerekli',
+    offlineNotice: 'Çevrimdışısın. Bazı özellikler kullanılamaz.',
+  },
+
+  // ─── Auth error mappings (used by translateAuthError) ─────────────
+  authErrors: {
+    rateLimited:    'Çok fazla deneme yaptınız. Lütfen birkaç dakika sonra tekrar deneyin.',
+    samePassword:   'Yeni şifre eskisinden farklı olmalı.',
+    sessionExpired: 'Oturumunuz sona erdi. Lütfen tekrar giriş yapın.',
+    network:        'Bağlantı hatası. İnternet bağlantınızı kontrol edip tekrar deneyin.',
   },
 
   // ─── Notifications ─────────────────────────────────

@@ -5,22 +5,26 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/store/auth';
-import { setAdminPreviewTier } from '@/lib/access-tier';
+import { setAdminPreviewTier, getAccessTier } from '@/lib/access-tier';
 import { supabase } from '@/lib/supabase';
 import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 
 /**
  * Shows at the top of the screen while admin/teacher is in preview mode.
- * - Admin: unlimited (just shows "Çıkış" button)
- * - Teacher (trial): 20 min/day cap; counts down minutes used
+ * - Admin / subscribed teacher: unlimited ("Sınırsız")
+ * - Teacher on trial or free plan: 20 min/day cap; counts down minutes used
  */
 export function AdminPreviewBanner() {
   const impersonating  = useAuth((s) => s.impersonating);
-  const role           = useAuth((s) => s.profile?.role);
+  const profile        = useAuth((s) => s.profile);
+  const role           = profile?.role;
   const stop           = useAuth((s) => s.stopImpersonation);
   const insets         = useSafeAreaInsets();
   const [remaining, setRemaining] = useState<number | null>(null);
+
+  const tier = getAccessTier(profile as any);
+  const isUnlimited = role === 'admin' || tier === 'subscribed';
 
   // Set the access tier override based on what's being previewed
   useEffect(() => {
@@ -28,13 +32,13 @@ export function AdminPreviewBanner() {
       setAdminPreviewTier(null);
       return;
     }
-    setAdminPreviewTier(role === 'admin' ? 'subscribed' : 'subscribed');
+    setAdminPreviewTier('subscribed');
     return () => setAdminPreviewTier(null);
   }, [impersonating, role]);
 
-  // For trial teachers: tick once per minute, consume 1 min via RPC
+  // For trial/free teachers only: tick once per minute, consume 1 min via RPC
   useEffect(() => {
-    if (!impersonating || role !== 'teacher') return;
+    if (!impersonating || role !== 'teacher' || isUnlimited) return;
     let cancelled = false;
 
     const tick = async () => {
@@ -61,7 +65,7 @@ export function AdminPreviewBanner() {
     tick();
     const id = setInterval(tick, 60_000);
     return () => { cancelled = true; clearInterval(id); };
-  }, [impersonating, role]);
+  }, [impersonating, role, isUnlimited]);
 
   const handleExit = () => {
     stop();
@@ -77,7 +81,11 @@ export function AdminPreviewBanner() {
       <Ionicons name="eye-outline" size={16} color={theme.colors.text.primary} />
       <Text style={styles.text}>
         Önizleme modu
-        {role === 'teacher' && remaining !== null ? ` · ${remaining} dk kaldı` : ''}
+        {isUnlimited
+          ? ' · Sınırsız'
+          : role === 'teacher' && remaining !== null
+            ? ` · ${remaining} dk kaldı`
+            : ''}
       </Text>
       <Pressable onPress={handleExit} hitSlop={10} style={styles.exitBtn}>
         <Text style={styles.exitText}>Çık</Text>

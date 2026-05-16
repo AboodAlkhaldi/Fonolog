@@ -35,21 +35,25 @@ export async function initPurchases(userId: string): Promise<void> {
 }
 
 /**
- * App-launch bootstrap: configure RevenueCat AND immediately sync entitlements
- * with the server. This catches:
- *   - subscriptions purchased on another device
- *   - subscriptions cancelled / expired since last app open
- *   - trial expiry
+ * App-launch bootstrap: configure RevenueCat ONLY.
+ *
+ * DB is the source of truth: `profiles.subscription_status` and
+ * `subscription_expires` are written by the revenuecat-webhook on the actual
+ * purchase event, by the `reconcile-subscriptions` cron once a day for missed
+ * webhooks, and by the `expire-subscriptions` cron when an active plan lapses.
+ *
+ * We intentionally do NOT call validate-subscription on every login: that path
+ * previously caused observable "re-charge / duplicate entitlement" symptoms.
+ * If a user explicitly taps "restore purchases" we still sync (see restorePurchases).
  */
 export async function bootstrapPurchases(userId: string): Promise<void> {
   await initPurchases(userId);
-  // Server is the source of truth — it queries RevenueCat directly with the secret key.
-  // We sync to refresh `profiles.subscription_status` then refresh the auth profile.
+  // Refresh the profile from DB so the local store reflects the server state
+  // (webhook may have updated subscription_status while the app was closed).
   try {
-    await syncSubscriptionToServer();
     await useAuth.getState().refreshProfile();
   } catch (e) {
-    console.warn('[purchases] bootstrap sync failed', e);
+    console.warn('[purchases] profile refresh failed', e);
   }
 }
 
