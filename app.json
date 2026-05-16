@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Okuma Dedektifi",
-    "slug": "okuma-dedektifi",
+    "name": "Fonolog",
+    "slug": "fonolog",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -15,14 +15,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.villaakademia.okumadedektifi",
+      "bundleIdentifier": "com.villaakademia.fonolog",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Okuma Dedektifi, telaffuzunu değerlendirmek için mikrofona erişim ister.",
+        "NSMicrophoneUsageDescription": "Fonolog, telaffuzunu değerlendirmek için mikrofona erişim ister.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.villaakademia.okumadedektifi",
+      "package": "com.villaakademia.fonolog",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FFF8E7"
