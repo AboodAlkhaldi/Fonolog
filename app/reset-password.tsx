@@ -8,6 +8,7 @@ import { useAuth } from '@/store/auth';
 import { useAlert } from '@/store/alert';
 import { supabase } from '@/lib/supabase';
 import { AppError } from '@/lib/error';
+import { translateAuthError } from '@/lib/auth-errors';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
@@ -23,11 +24,14 @@ export default function ResetPasswordScreen() {
       if (password.length < 8) throw new AppError(t('auth.resetPassword.errorShort') as string);
       if (password !== passwordConfirm) throw new AppError(t('auth.resetPassword.errorMismatch') as string);
       const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw new AppError(error.message);
+      if (error) throw new AppError(translateAuthError(error), (error as any)?.code);
     },
-    onSuccess: async () => {
-      await signOut();
+    onSuccess: () => {
+      // Navigate first so the screen unmounts immediately and the button leaves
+      // its loading state. signOut runs in the background; the protected-route
+      // hook will keep us on (auth) routes once the auth listener flips status.
       router.replace('/(auth)/login');
+      signOut().catch((e) => console.warn('[reset-password] signOut:', e));
     },
     onError: alert.setAlert,
   });

@@ -8,6 +8,7 @@ import { Screen, Button, Input, ErrorBanner } from '@/components';
 import { useAlert } from '@/store/alert';
 import { supabase } from '@/lib/supabase';
 import { AppError } from '@/lib/error';
+import { translateAuthError } from '@/lib/auth-errors';
 import { useForm }  from '@/lib/useForm';
 import { forgotSchema, type ForgotValues } from '@/lib/schemas';
 import { theme } from '@/theme';
@@ -23,7 +24,7 @@ export default function ForgotScreen() {
       const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
         redirectTo: 'okuma://reset-password',
       });
-      if (error) throw new AppError(error.message);
+      if (error) throw new AppError(translateAuthError(error), (error as any)?.code);
     },
     onError: alert.setAlert,
   });

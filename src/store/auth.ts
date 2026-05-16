@@ -17,6 +17,8 @@ import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { AppError } from '@/lib/error';
+import { translateAuthError } from '@/lib/auth-errors';
+import { setupDeepLinks } from '@/lib/deep-linking';
 import type { ProfileRow } from '@/lib/database.types';
 
 export type AuthStatus =
@@ -116,6 +118,14 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ status: 'unauthenticated', session: null, user: null, profile: null });
     }
 
+    // Deep-link recovery: parse okuma://reset-password#access_token=... and
+    // install the session. After that, flip status so the protected route
+    // navigates to /reset-password. This is needed because on native we run
+    // with detectSessionInUrl: false, so Supabase does not auto-handle the URL.
+    setupDeepLinks(() => {
+      set({ status: 'needsPasswordReset' });
+    });
+
     supabase.auth.onAuthStateChange(async (event, newSession) => {
       // Password recovery deep link → route to reset-password page.
       if (event === 'PASSWORD_RECOVERY') {
@@ -144,6 +154,16 @@ export const useAuth = create<AuthState>((set, get) => ({
           p = { ...p, is_active: true } as any;
         }
 
+        // If a recovery deep-link already flipped us to needsPasswordReset,
+        // preserve that ONLY while a session is present — setSession from the
+        // deep-link fires SIGNED_IN which would otherwise overwrite recovery
+        // state with 'authenticated'. On SIGNED_OUT (no session) we fall
+        // through so signOut() can complete the transition.
+        if (get().status === 'needsPasswordReset' && newSession?.user) {
+          set({ session: newSession, user: newSession.user, profile: p });
+          return;
+        }
+
         const derived = deriveStatus(newSession, p);
         set({
           session: newSession,
@@ -163,7 +183,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       password,
       options: { data: { full_name: fullName } },
     });
-    if (error) throw new AppError(error.message);
+    if (error) throw new AppError(translateAuthError(error), (error as any)?.code);
 
     // Supabase returns success with empty identities when the email is already
     // registered AND confirmed (security by obfuscation). Surface a real error.
@@ -178,7 +198,7 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   signIn: async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw new AppError(error.message);
+    if (error) throw new AppError(translateAuthError(error), (error as any)?.code);
 
     let profile: Profile | null = null;
     if (data.session?.user) {
@@ -221,7 +241,9 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   signOut: async () => {
-    await supabase.auth.signOut();
+    // Flip local state first so useProtectedRoute can react immediately and any
+    // caller using fire-and-forget signOut() sees the UI transition without
+    // waiting for the server. The server revocation still happens below.
     set({
       status: 'unauthenticated',
       session: null,
@@ -229,13 +251,14 @@ export const useAuth = create<AuthState>((set, get) => ({
       profile: null,
       impersonating: null,
     });
+    await supabase.auth.signOut();
   },
 
   resendVerification: async () => {
     const { user } = get();
     if (!user?.email) throw new AppError('No email on session');
     const { error } = await supabase.auth.resend({ type: 'signup', email: user.email });
-    if (error) throw new AppError(error.message);
+    if (error) throw new AppError(translateAuthError(error), (error as any)?.code);
   },
 
   refreshProfile: async () => {

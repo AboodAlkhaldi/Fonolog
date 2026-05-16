@@ -1,17 +1,13 @@
 /**
- * Tier / access helpers — single source of truth for game-access freemium logic.
+ * Tier helpers — subscription-status classification only.
  *
- * Tiers:
- *   admin                                      → unlimited everything
- *   subscribed (active/student/expert)         → all 24 modules, all words
- *   trial (within 7 days, status='trial')      → level 0+1, no pronunciation games
- *   free (expired trial / no sub)              → level 0 only, no pronunciation games
- *
- * Quotas for non-game features (PDFs, assignments, students, reports) are
- * tracked in src/lib/entitlements.ts + the feature_usage table.
+ * Game-access gating moved to src/lib/day-progress.ts when we switched from
+ * `level`-based unlocks to the 7-day curriculum. This file is intentionally
+ * narrower now: it answers "what subscription tier is this user?" and exposes
+ * a handful of display helpers. It no longer decides which modules are
+ * playable — call `canPlayModule` from `@/lib/day-progress` for that.
  */
-import type { Profile, ModuleDefinition } from '@/domain';
-import { getModule } from '@/domain';
+import type { Profile } from '@/domain';
 
 export type AccessTier = 'admin' | 'subscribed' | 'trial' | 'free';
 
@@ -49,29 +45,6 @@ export function getAccessTier(profile: Profile | null | undefined): AccessTier {
   return 'free';
 }
 
-/** free tier: level 0 only, no pronunciation. */
-function isOpenForFreeTier(def: ModuleDefinition): boolean {
-  return def.level === 0 && !def.usesPronunciation;
-}
-
-/** trial tier: level 0+1, no pronunciation. */
-function isOpenForTrialTier(def: ModuleDefinition): boolean {
-  return (def.level === 0 || def.level === 1) && !def.usesPronunciation;
-}
-
-/** Can this tier launch this module? Accepts module ID or full definition. */
-export function canPlayModule(tier: AccessTier, moduleIdOrDef: string | ModuleDefinition): boolean {
-  if (tier === 'admin' || tier === 'subscribed') return true;
-
-  const def = typeof moduleIdOrDef === 'string'
-    ? getModule(moduleIdOrDef)
-    : moduleIdOrDef;
-  if (!def) return false;
-
-  if (tier === 'trial') return isOpenForTrialTier(def);
-  return isOpenForFreeTier(def);
-}
-
 /** How many words from a category should the user see in a session? null = unlimited. */
 export function maxWordsForTier(tier: AccessTier): number | null {
   if (tier === 'admin' || tier === 'subscribed' || tier === 'trial') return null;
@@ -91,30 +64,6 @@ export function trialDaysRemaining(profile: Profile | null | undefined): number 
   const ms = expires.getTime() - Date.now();
   if (ms <= 0) return null;
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
-}
-
-/**
- * Plan-lock: module is off-limits due to subscription tier.
- * Used for paywall redirect.
- */
-export function isModuleLocked(tier: AccessTier, moduleDef: ModuleDefinition): boolean {
-  if (tier === 'admin' || tier === 'subscribed') return false;
-  if (tier === 'trial') return !isOpenForTrialTier(moduleDef);
-  return !isOpenForFreeTier(moduleDef);
-}
-
-/**
- * Level-lock: subscribed/admin user hasn't reached the module's level yet.
- * Only applies to paid users — free/trial users see plan-lock instead.
- * Returns true when the student needs to progress further before unlocking.
- */
-export function isModuleLevelLocked(
-  tier: AccessTier,
-  moduleDef: ModuleDefinition,
-  studentLevel: number,
-): boolean {
-  if (tier !== 'subscribed' && tier !== 'admin') return false;
-  return moduleDef.level > studentLevel;
 }
 
 /** Map subscription_status to a Turkish display label. */
