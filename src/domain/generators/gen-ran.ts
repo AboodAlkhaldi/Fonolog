@@ -1,22 +1,21 @@
 // RAN — Rapid Automatic Naming (Level 5)
-// Screen type: quiz (timed — response time is the key metric)
-// Task: See image/emoji → name it as fast as possible
-// Response time is measured in milliseconds per question
+// Screen type: quiz (4-option multiple choice — speed is just a side metric)
+// Task: See the picture → tap the correct name as fast as possible.
 import type { Word } from '../types/word.types'
 import type { Question } from '../types/module.types'
-import { shuffle, qid } from './utils'
+import { shuffle, makeOptions, qid } from './utils'
 
 export function genRan(words: Word[]): Question[] {
-  // For RAN, we want visually distinctive words with good images
-  // Prefer words with SVG illustrations
-  const withSvg = words.filter(w => w.svg)
-  const pool    = withSvg.length >= 10 ? withSvg : words
-  return shuffle(pool).slice(0, 20).map((word, i) => ({
+  // Prefer the same visually distinctive categories the HTML reference uses.
+  const preferred = words.filter(w => ['Renkler', 'Rakamlar', 'Hayvanlar'].includes(w.kat))
+  const pool      = preferred.length >= 10 ? preferred : words
+  const picked    = shuffle(pool).slice(0, 20)
+  const allWords  = picked.map(w => w.word)
+  return picked.map((word, i) => ({
     id:      qid('ran', i),
     word,
+    options: makeOptions(word.word, allWords),
     correct: word.word,
-    prompt:  'Ne kadar hızlı söyleyebilirsin?',
-    // RAN sessions measure avg_response_ms
-    // QuizSession component handles timing when module.id === 'ran'
+    prompt:  'Bu nesnenin adı nedir? Hızlı cevapla!',
   }))
 }

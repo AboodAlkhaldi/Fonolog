@@ -13,6 +13,7 @@ export function genIlkHeceSilme(words: Word[]): Question[] {
       word,
       correct: remaining,
       prompt:  `"${word.word}" kelimesinin ilk hecesini çıkar. Ne kalır?`,
+      extra:   { inputMode: 'suffix' }, // user types the remaining suffix: --[input]
     }
   })
 }

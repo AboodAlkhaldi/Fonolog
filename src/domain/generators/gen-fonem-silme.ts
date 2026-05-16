@@ -13,6 +13,7 @@ export function genFonemSilme(words: Word[]): Question[] {
       word,
       correct: withoutFirst,
       prompt:  `"${word.word}" kelimesinin ilk sesini çıkar. Ne kalır?`,
+      extra:   { inputMode: 'suffix' }, // user types the remaining suffix: --[input]
     }
   })
 }

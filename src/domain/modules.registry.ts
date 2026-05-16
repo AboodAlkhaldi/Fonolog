@@ -39,7 +39,6 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     screenType:      'explore',
     generator:       genKesfet,
     requiresPremium: true,
-    usesPronunciation: true,
   },
   {
     id:              'tani',
@@ -169,10 +168,9 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     familyTip:       'Markete giderken alışveriş listesini ezberleyin. "Süt, ekmek, yumurta" gibi kısa listeler zamanla uzatılabilir.',
     color:           '#8B5CF6',
     level:           2,
-    screenType:      'memory',
+    screenType:      'sequence',
     generator:       genKelimeDizisi,
     requiresPremium: true,
-    usesPronunciation: true,
   },
   {
     id:              'siraliHatirla',
@@ -183,10 +181,9 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     familyTip:       'Günlük rutinleri sırayla anlatmasını isteyin. "Önce ne yaptık, sonra ne?" sorusu sekansal hafızayı destekler.',
     color:           '#10B981',
     level:           2,
-    screenType:      'memory',
+    screenType:      'sequence',
     generator:       genSiraliHatirla,
     requiresPremium: true,
-    usesPronunciation: true,
   },
   // ── LEVEL 3: FONEM ─────────────────────────────────────────────
   {
@@ -292,7 +289,6 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     screenType:      'phoneme',
     generator:       genFonemSilme,
     requiresPremium: true,
-    usesPronunciation: true,
   },
   {
     id:              'ilkHeceSilme',
@@ -306,7 +302,6 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     screenType:      'phoneme',
     generator:       genIlkHeceSilme,
     requiresPremium: true,
-    usesPronunciation: true,
   },
   {
     id:              'sonHeceSilme',
@@ -320,7 +315,6 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     screenType:      'phoneme',
     generator:       genSonHeceSilme,
     requiresPremium: true,
-    usesPronunciation: true,
   },
   // ── LEVEL 4: AKICILIK ──────────────────────────────────────────
   {
@@ -335,7 +329,6 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     screenType:      'quiz',
     generator:       genRan,
     requiresPremium: true,
-    usesPronunciation: true,
     isNew:           false,
   },
 ]

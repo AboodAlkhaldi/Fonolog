@@ -1,17 +1,26 @@
 // KELİME DİZİSİ — Word Series Memory (Level 2)
-// Screen type: memory (adaptive flash + recall)
-// Task: Listen to word sequence → tap in correct order
-// Uses adaptive difficulty (see APPENDIX B in agent prompt)
+// Screen type: sequence — word-recall mode (text-only option buttons)
+// Task: Watch emojis flash one by one → tap their NAMES back in the same order.
 import type { Word } from '../types/word.types'
 import type { Question } from '../types/module.types'
 import { shuffle, qid } from './utils'
 
+const GROUP_SIZE = 3
+
 export function genKelimeDizisi(words: Word[]): Question[] {
-  // Returns question pool; actual adaptive logic is in MemorySession component
-  return shuffle(words).slice(0, 30).map((word, i) => ({
-    id:      qid('kd', i),
-    word,
-    correct: word.word,
-    prompt:  'Kelimeleri sırayla hatırla!',
-  }))
+  const pool = shuffle(words)
+  const questions: Question[] = []
+  for (let i = 0; i + GROUP_SIZE <= pool.length && questions.length < 12; i += GROUP_SIZE) {
+    const seq        = pool.slice(i, i + GROUP_SIZE)
+    const distractors = shuffle(words.filter(w => !seq.find(s => s.word === w.word))).slice(0, 3)
+    const options    = shuffle([...seq, ...distractors])
+    questions.push({
+      id:      qid('kd', questions.length),
+      word:    seq[0],
+      correct: seq.map(w => w.word).join(','),
+      prompt:  'Gördüğün resimleri sırayla seç!',
+      extra:   { mode: 'word', sequence: seq, options },
+    })
+  }
+  return questions
 }

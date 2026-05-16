@@ -13,6 +13,7 @@ export function genSonHeceSilme(words: Word[]): Question[] {
       word,
       correct: remaining,
       prompt:  `"${word.word}" kelimesinin son hecesini çıkar. Ne kalır?`,
+      extra:   { inputMode: 'prefix' }, // user types the remaining prefix: [input]--
     }
   })
 }

@@ -1,6 +1,6 @@
 import type { Word } from './word.types'
 
-export type ScreenType = 'quiz' | 'builder' | 'phoneme' | 'memory' | 'visual' | 'explore' | 'pronunciation' | 'audio-pair'
+export type ScreenType = 'quiz' | 'builder' | 'phoneme' | 'memory' | 'visual' | 'explore' | 'pronunciation' | 'audio-pair' | 'sequence'
 
 export type SessionMode = 'free' | 'learn' | 'revision' | 'homework' | 'test'
 
