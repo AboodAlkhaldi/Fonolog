@@ -15,7 +15,7 @@ export function withPreviewPlaceholders(
   return {
     ...profile,
     full_name:           'Öğrenci Adı',
-    email:               'ornek@okumadedektifi.com',
+    email:               'ornek@fonolog.com',
     child_age:           null,
     child_avatar_emoji:  PREVIEW_PLACEHOLDER_AVATAR,
     school_name:         '-',

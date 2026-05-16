@@ -14,7 +14,13 @@ import {
   type AdaptiveState,
 } from '@/domain/adaptive';
 import { supabase } from '@/lib/supabase';
-import { getAccessTier, canPlayModule, maxWordsForTier } from '@/lib/access-tier';
+import { getAccessTier, maxWordsForTier } from '@/lib/access-tier';
+import {
+  loadDayProgress,
+  canPlayModule,
+  markModuleComplete,
+  DAY_COMPLETION_MIN_ACCURACY,
+} from '@/lib/day-progress';
 import { useAuth } from './auth';
 
 export type Verdict   = 'correct' | 'wrong' | null;
@@ -31,6 +37,9 @@ interface AnswerLog {
 
 interface SessionExtra {
   assignmentId?: string;
+  /** True if this session was the last one needed to finish today's curriculum.
+   *  The result screen reads this to fire the "all unlocked" popup. */
+  dayJustCompleted?: boolean;
 }
 
 interface SessionState {
@@ -118,20 +127,31 @@ export const useSession = create<SessionState>((set, get) => ({
       const profile = useAuth.getState().profile;
       const tier    = getAccessTier(profile);
 
-      if (!canPlayModule(tier, moduleId)) {
-        set({ status: 'locked', errorMessage: 'Bu modül abonelik gerektirir.' });
-        return;
+      // Teacher-assigned homework bypasses day-based gating — the teacher
+      // explicitly granted access, and the assignment screen handles its own
+      // word/module scoping. For any other launch path we run the day-aware
+      // access check.
+      if (!opts.assignmentId) {
+        const dayProgress = profile ? await loadDayProgress(profile.id) : null;
+        if (!dayProgress || !canPlayModule(profile, dayProgress, moduleId)) {
+          set({ status: 'locked', errorMessage: 'Önce bugünün oyunlarını bitir.' });
+          return;
+        }
       }
 
       const ageBased  = SESSION_LENGTH_BY_AGE(profile?.child_age ?? null);
       const wordCap   = maxWordsForTier(tier);
-      // New random-from-all-words flow (no category, no specific word list)
-      // serves a fixed 20-question session. Category- or assignment-scoped
-      // sessions keep the original age-based length so existing flows (admin
-      // category drill-in, teacher-assigned ödev) are untouched.
+      // Teacher-assigned homework must use ALL selected words regardless of the
+      // student's age or tier cap — the teacher decided the scope, not us. For
+      // random-from-all (no category, no word list) we keep the 20-Q fixed
+      // length; for category drill-ins we keep the age-based length.
+      const isAssignment    = Boolean(opts.assignmentId) && Boolean(opts.wordIds && opts.wordIds.length > 0);
       const isRandomFromAll = !opts.categoryId && !(opts.wordIds && opts.wordIds.length > 0);
       const baseDefault     = isRandomFromAll ? 20 : ageBased;
-      const maxQ      = opts.maxQuestions ?? Math.min(baseDefault, wordCap ? wordCap * 2 : baseDefault);
+      const maxQ      = opts.maxQuestions
+        ?? (isAssignment
+              ? opts.wordIds!.length * 4
+              : Math.min(baseDefault, wordCap ? wordCap * 2 : baseDefault));
 
       const qs = await generateSession(moduleId, { ...opts, maxQuestions: maxQ });
       if (qs.length === 0) {
@@ -257,6 +277,23 @@ export const useSession = create<SessionState>((set, get) => ({
       console.warn('[session] adaptive persist failed', e);
     }
 
+    // Day-curriculum tracking — only for non-assignment sessions that hit the
+    // ≥50% threshold. Assignment sessions are tracked separately below.
+    if (!extra.assignmentId && total > 0 && (correctCnt / total) >= DAY_COMPLETION_MIN_ACCURACY) {
+      try {
+        const tier = getAccessTier(profile);
+        const progress = await loadDayProgress(profile.id);
+        const result = await markModuleComplete(profile.id, tier, progress, moduleId);
+        if (result.justFinishedDay) {
+          // Surface to the UI via session state so the result screen can
+          // fire the "all unlocked" celebration popup.
+          set({ extra: { ...extra, dayJustCompleted: true } });
+        }
+      } catch (e) {
+        console.warn('[session] day-completion tracking failed', e);
+      }
+    }
+
     if (extra.assignmentId) {
       const { data: updated } = await supabase.from('assignments').update({
         status: 'completed',
@@ -264,13 +301,15 @@ export const useSession = create<SessionState>((set, get) => ({
         session_id: sessionId,
       }).eq('id', extra.assignmentId).select('teacher_id, title').maybeSingle();
 
-      // Notify teacher that the student completed the homework.
+      // Notify teacher that the student completed the homework (in-app + push).
       if (updated?.teacher_id) {
+        const notifBody = `${profile.full_name ?? 'Öğrenci'} "${updated.title}" ödevini bitirdi (${correctCnt}/${total} doğru).`;
+        // In-app notification (RLS allows student → linked teacher)
         await supabase.from('notifications').insert({
           user_id: updated.teacher_id,
           type:    'assignment_completed',
           title:   'Ödev Tamamlandı',
-          body:    `${profile.full_name ?? 'Öğrenci'} "${updated.title}" ödevini bitirdi (${correctCnt}/${total} doğru).`,
+          body:    notifBody,
           payload: {
             assignment_id: extra.assignmentId,
             student_id:    profile.id,
@@ -279,6 +318,16 @@ export const useSession = create<SessionState>((set, get) => ({
             total,
           },
         });
+        // Push notification — fire-and-forget; failure is non-blocking
+        supabase.functions.invoke('send-push', {
+          body: {
+            user_id: updated.teacher_id,
+            title:   'Ödev Tamamlandı',
+            body:    notifBody,
+            type:    'assignment_completed',
+            data:    { assignment_id: extra.assignmentId, student_id: profile.id },
+          },
+        }).catch((e) => console.warn('[session] send-push failed', e));
       }
     }
 
