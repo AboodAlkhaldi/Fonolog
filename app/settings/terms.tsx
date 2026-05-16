@@ -23,13 +23,13 @@ export default function TermsScreen() {
         <Text style={styles.updated}>Son güncelleme: [TARİH]</Text>
 
         <Text style={styles.body}>
-          Bu uygulama ("Okuma Dedektifi") Villa Akademia tarafından sunulmaktadır.
+          Bu uygulama ("Fonolog") Villa Akademia tarafından sunulmaktadır.
           Uygulamayı kullanarak aşağıdaki koşulları kabul etmiş olursunuz.
         </Text>
 
         <Text style={styles.h3}>1. Hizmet Kapsamı</Text>
         <Text style={styles.body}>
-          Okuma Dedektifi, çocukların Türkçe okuma becerilerini geliştirmeye yönelik
+          Fonolog, çocukların Türkçe okuma becerilerini geliştirmeye yönelik
           eğitici bir mobil uygulamadır. Uygulama içeriği yalnızca eğitim amaçlıdır.
         </Text>
 

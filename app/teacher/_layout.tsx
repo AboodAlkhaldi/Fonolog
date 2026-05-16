@@ -2,11 +2,15 @@ import React from 'react';
 import { View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AdminPreviewBanner } from '@/components/common/AdminPreviewBanner';
 import { theme } from '@/theme';
 
 export default function TeacherLayout() {
+  const insets = useSafeAreaInsets();
+  const tabBarPaddingBottom = Math.max(insets.bottom, 8);
+
   return (
     <View style={{ flex: 1 }}>
       <AdminPreviewBanner />
@@ -23,9 +27,9 @@ export default function TeacherLayout() {
             backgroundColor: theme.colors.background.secondary,
             borderTopColor: theme.colors.border.subtle,
             borderTopWidth: 1,
-            height: 64,
+            height: 56 + tabBarPaddingBottom,
             paddingTop: 6,
-            paddingBottom: 8,
+            paddingBottom: tabBarPaddingBottom,
           },
         }}
       >

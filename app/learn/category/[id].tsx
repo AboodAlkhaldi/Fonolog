@@ -12,7 +12,8 @@ import {
   type ModuleDefinition,
 } from '@/domain';
 import { useAuth } from '@/store/auth';
-import { getAccessTier, isModuleLocked } from '@/lib/access-tier';
+import { loadDayProgress, canPlayModule, type DayProgress } from '@/lib/day-progress';
+import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
@@ -23,6 +24,7 @@ export default function CategoryScreen() {
   const [category, setCategory] = useState<Category | null>(null);
   const [words,    setWords]    = useState<Word[] | null>(null);
   const [error,    setError]    = useState<string | null>(null);
+  const [dayProgress, setDayProgress] = useState<DayProgress | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -35,11 +37,15 @@ export default function CategoryScreen() {
           const ws = await contentRepository.getWordsByCategoryId(id);
           setWords(ws);
         }
+        if (profile) {
+          const dp = await loadDayProgress(profile.id);
+          setDayProgress(dp);
+        }
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : t('app.error'));
       }
     })();
-  }, [id]);
+  }, [id, profile?.id]);
 
   if (error) {
     return (
@@ -52,14 +58,14 @@ export default function CategoryScreen() {
   if (!category || !words) return <Screen><Loading /></Screen>;
 
   const modules = listModules();
-  const tier = getAccessTier(profile);
 
   const launchModule = (m: ModuleDefinition) => {
-    if (isModuleLocked(tier, m)) {
-      router.push('/paywall');
+    if (!dayProgress) return;
+    if (!canPlayModule(profile, dayProgress, m.id)) {
+      showAlert(t('day.lockedTitle'), t('day.locked'), [{ text: t('app.ok'), style: 'cancel' }]);
       return;
     }
-    router.push(`/session/${m.id}?categoryId=${category.id}`);
+    router.push(`/session/${m.id}?categoryId=${category.id}` as any);
   };
 
   return (
@@ -90,7 +96,7 @@ export default function CategoryScreen() {
           </View>
         }
         renderItem={({ item: m }) => {
-          const locked = isModuleLocked(tier, m);
+          const locked = dayProgress ? !canPlayModule(profile, dayProgress, m.id) : true;
           return (
             <Pressable
               onPress={() => launchModule(m)}
@@ -103,8 +109,7 @@ export default function CategoryScreen() {
                   <Text style={styles.moduleDesc} numberOfLines={2}>{m.description}</Text>
                 ) : null}
                 <View style={styles.moduleMeta}>
-                  <Badge label={t('learn.levelBadge', { level: m.level })} variant="info" />
-                  {locked ? <Badge label="🔒 Pro" variant="warning" /> : null}
+                  {locked ? <Badge label="🔒" variant="warning" /> : null}
                 </View>
               </View>
               <Ionicons

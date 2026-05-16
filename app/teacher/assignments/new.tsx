@@ -9,7 +9,6 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/auth';
 import { contentRepository, listModules } from '@/domain';
 import { checkUsage, recordUsage } from '@/lib/entitlements';
-import { getAccessTier, canPlayModule } from '@/lib/access-tier';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
@@ -30,7 +29,6 @@ export default function NewAssignment() {
 
   const modules = listModules();
   const [pickedModules, setPickedModules] = useState<Set<string>>(new Set());
-  const [studentAccessTier, setStudentAccessTier] = useState<ReturnType<typeof getAccessTier>>('free');
 
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -59,19 +57,6 @@ export default function NewAssignment() {
       setAllWords(w);
     })();
   }, [teacher?.id]);
-
-  // Fetch selected student's profile to compute their access tier.
-  useEffect(() => {
-    if (!studentId) return;
-    (async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('subscription_status,subscription_expires,role')
-        .eq('id', studentId)
-        .maybeSingle();
-      setStudentAccessTier(getAccessTier(data ?? null));
-    })();
-  }, [studentId]);
 
   const submit = async () => {
     if (!teacher) return;
@@ -214,36 +199,22 @@ export default function NewAssignment() {
             contentContainerStyle={{ paddingBottom: theme.spacing[3] }}
           >
             {modules.map((m) => {
-              const accessible = canPlayModule(studentAccessTier, m);
-              const selected   = pickedModules.has(m.id);
-              const lockReason = !accessible
-                ? (m.usesPronunciation ? t('teacher.assignment.lockPronunciation') : t('teacher.assignment.lockLevel', { level: m.level }))
-                : null;
+              const selected = pickedModules.has(m.id);
               return (
                 <Pressable
                   key={m.id}
                   onPress={() => {
-                    if (!accessible) {
-                      showAlert(t('teacher.assignment.lockTitle'), t('teacher.assignment.lockMsg', { reason: lockReason }));
-                      return;
-                    }
                     const next = new Set(pickedModules);
                     selected ? next.delete(m.id) : next.add(m.id);
                     setPickedModules(next);
                   }}
-                  style={[styles.row, selected && styles.rowSelected, !accessible && styles.rowLocked]}
+                  style={[styles.row, selected && styles.rowSelected]}
                 >
-                  <Text style={{ fontSize: 24, opacity: accessible ? 1 : 0.4 }}>{m.icon}</Text>
+                  <Text style={{ fontSize: 24 }}>{m.icon}</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.rowText, !accessible && styles.rowTextLocked]}>{m.title}</Text>
-                    {lockReason
-                      ? <Text style={styles.lockLabel}>{lockReason}</Text>
-                      : <Text style={styles.rowSubtext}>{m.description}</Text>
-                    }
+                    <Text style={styles.rowText}>{m.title}</Text>
+                    <Text style={styles.rowSubtext}>{m.description}</Text>
                   </View>
-                  {!accessible && (
-                    <Ionicons name="lock-closed" size={16} color={theme.colors.text.muted} />
-                  )}
                 </Pressable>
               );
             })}

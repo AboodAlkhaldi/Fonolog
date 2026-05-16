@@ -43,6 +43,9 @@ import { useAuth, type AuthStatus } from '@/store/auth';
 import { initAudio } from '@/audio/audio.service';
 import { bootstrapPurchases } from '@/lib/purchases';
 import { registerForPushNotifications } from '@/lib/notifications';
+import { contentRepository } from '@/domain';
+import { advanceDayIfNeeded, loadDayProgress } from '@/lib/day-progress';
+import { getAccessTier } from '@/lib/access-tier';
 import { AlertModal } from '@/components/common/AlertModal';
 import { theme } from '@/theme';
 
@@ -123,6 +126,22 @@ export default function RootLayout() {
     if (status === 'authenticated' && user?.id) {
       bootstrapPurchases(user.id).catch((e) => console.warn('[boot] purchases', e));
       registerForPushNotifications().catch((e) => console.warn('[boot] push', e));
+      // Pre-warm the content cache so the user can play offline immediately
+      // after login. Repository handles cache hits and background refresh.
+      Promise.all([contentRepository.getAllWords(), contentRepository.getCategories()])
+        .catch((e) => console.warn('[boot] content warm-up', e));
+      // Day advancement check — if the student fully completed their previous
+      // day and is now opening the app on a new local calendar date, roll
+      // current_day forward. No-op for admin / free.
+      (async () => {
+        const profile = useAuth.getState().profile;
+        if (!profile || profile.role !== 'student') return;
+        // ProfileRow ↔ domain Profile diverge structurally but agree on the
+        // fields getAccessTier reads. Cast bridges the type mismatch.
+        const tier = getAccessTier(profile as any);
+        const progress = await loadDayProgress(profile.id);
+        await advanceDayIfNeeded(profile.id, tier, progress);
+      })().catch((e) => console.warn('[boot] day advance', e));
     }
   }, [status, user?.id]);
 
@@ -149,6 +168,7 @@ export default function RootLayout() {
               animation: 'slide_from_right',
             }}
           >
+            <Stack.Screen name="intro"         options={{ animation: 'fade', headerShown: false }} />
             <Stack.Screen name="(auth)"        options={{ animation: 'fade' }} />
             <Stack.Screen name="(onboarding)"  options={{ animation: 'fade' }} />
             <Stack.Screen name="(tabs)"        options={{ animation: 'fade' }} />

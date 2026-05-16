@@ -1,14 +1,17 @@
-import React, { useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import React, { useEffect, useCallback } from 'react';
+import { View, Text, Pressable, StyleSheet, BackHandler } from 'react-native';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Button, Loading, ErrorBanner } from '@/components';
 import { showAlert } from '@/store/alert';
-import { MultipleChoiceQuestion } from '@/components/session/MultipleChoiceQuestion';
-import { BuilderQuestion }        from '@/components/session/BuilderQuestion';
-import { PronunciationQuestion }  from '@/components/session/PronunciationQuestion';
-import { AudioPairQuestion }      from '@/components/session/AudioPairQuestion';
+import { MultipleChoiceQuestion }   from '@/components/session/MultipleChoiceQuestion';
+import { BuilderQuestion }          from '@/components/session/BuilderQuestion';
+import { PronunciationQuestion }    from '@/components/session/PronunciationQuestion';
+import { KeyboardPhonemeQuestion }  from '@/components/session/KeyboardPhonemeQuestion';
+import { AudioPairQuestion }        from '@/components/session/AudioPairQuestion';
+import { ExploreCard }              from '@/components/session/ExploreCard';
+import { SequenceQuestion }         from '@/components/session/SequenceQuestion';
 import { QuestionPrompt }         from '@/components/session/QuestionPrompt';
 import { useSession, sessionProgress } from '@/store/session';
 import { getModule } from '@/domain';
@@ -34,6 +37,28 @@ export default function SessionScreen() {
   const next          = useSession((s) => s.next);
   const reset         = useSession((s) => s.reset);
   const progress      = useSession(sessionProgress);
+
+  const handleQuit = useCallback(() => {
+    showAlert(
+      t('session.quit'),
+      t('session.quitConfirm'),
+      [
+        { text: t('app.no'),  style: 'cancel' },
+        { text: t('app.yes'), style: 'destructive', onPress: () => { reset(); router.back(); } },
+      ],
+    );
+  }, [reset]);
+
+  // Android hardware back button → show quit dialog instead of navigating away
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        handleQuit();
+        return true; // consume the event — don't let the navigator pop automatically
+      });
+      return () => sub.remove();
+    }, [handleQuit]),
+  );
 
   // Boot the session whenever route params change
   useEffect(() => {
@@ -63,17 +88,6 @@ export default function SessionScreen() {
 
   const moduleDef  = getModule(moduleId);
   const screenType = moduleDef?.screenType;
-
-  const handleQuit = () => {
-    showAlert(
-      t('session.quit'),
-      t('session.quitConfirm'),
-      [
-        { text: t('app.no'),  style: 'cancel' },
-        { text: t('app.yes'), style: 'destructive', onPress: () => { reset(); router.back(); } },
-      ],
-    );
-  };
 
   if (status === 'loading') return <Screen><Loading message={t('session.loading')} /></Screen>;
 
@@ -132,10 +146,29 @@ export default function SessionScreen() {
             chosen={lastChosen}
             onChoose={answer}
           />
+        ) : screenType === 'phoneme' ? (
+          <KeyboardPhonemeQuestion
+            question={question}
+            status={qStatus}
+            chosen={lastChosen}
+            onChoose={answer}
+          />
+        ) : screenType === 'explore' ? (
+          <ExploreCard
+            question={question}
+            status={qStatus}
+            chosen={lastChosen}
+            onChoose={answer}
+          />
+        ) : screenType === 'sequence' ? (
+          <SequenceQuestion
+            question={question}
+            status={qStatus}
+            chosen={lastChosen}
+            onChoose={answer}
+          />
         ) : (
           screenType === 'pronunciation' ||
-          screenType === 'phoneme' ||
-          screenType === 'explore' ||
           screenType === 'memory' ||
           !question.options || question.options.length === 0
         ) ? (

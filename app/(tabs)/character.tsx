@@ -142,9 +142,26 @@ export default function CharacterTab() {
       showAlert(extra.name, t('character.unlockRequired', { xp: extra.unlock_xp }));
       return;
     }
+    // Optimistic update: write to the slot that matches this extra's category so
+    // the UI reflects the change instantly. The RPC syncs the DB in the background.
+    const slotKey: Record<string, keyof CharRow> = {
+      hat:   'equipped_hat',
+      shirt: 'equipped_shirt',
+      shoes: 'equipped_shoes',
+      acc:   'equipped_acc',
+      bg:    'equipped_bg',
+    };
+    const slot = slotKey[extra.category_id];
+    const prev = character;
+    if (slot) {
+      setCharacter((c) => c ? { ...c, [slot]: extra.id } as CharRow : c);
+    }
     const { error } = await supabase.rpc('equip_item', { p_item_id: extra.id });
-    if (error) { showAlert(t('app.error_title'), error.message); return; }
-    await load();
+    if (error) {
+      // Rollback on failure
+      setCharacter(prev);
+      showAlert(t('app.error_title'), error.message);
+    }
   };
 
   const baseDef = bases.find((b) => b.id === character.base_character_id) ?? null;
@@ -167,7 +184,10 @@ export default function CharacterTab() {
           base={baseDef ? { id: baseDef.id, asset_url: baseDef.asset_url, asset_type: baseDef.asset_type } : null}
           extras={equippedExtras.map((e) => e ? { id: e.id, asset_url: e.asset_url, asset_type: e.asset_type } : null)}
           size={120}
-          fallbackEmoji={profile?.child_avatar_emoji ?? '🦁'}
+          fallbackEmoji={
+            baseDef ? placeholderEmoji(baseDef.asset_url, profile?.child_avatar_emoji ?? '🦁')
+                    : (profile?.child_avatar_emoji ?? '🦁')
+          }
         />
         <View style={styles.statsCol}>
           <Text style={styles.characterName}>{profile?.full_name?.split(' ')[0] ?? 'Kahraman'}</Text>

@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen, Button } from '@/components';
 import { useSession } from '@/store/session';
 import { useAuth }    from '@/store/auth';
+import { showAlert }  from '@/store/alert';
+import { getAccessTier } from '@/lib/access-tier';
 import { theme } from '@/theme';
 import { t }     from '@/i18n';
 
@@ -33,7 +35,20 @@ export default function SessionResultScreen() {
     (async () => {
       await finish();
       await refreshProfile();
-      if (alive) setPersisted(true);
+      if (!alive) return;
+      setPersisted(true);
+
+      // Day-completion celebration. finish() sets extra.dayJustCompleted when
+      // this session was the one that closed today's curriculum.
+      const justFinished = useSession.getState().extra.dayJustCompleted;
+      if (justFinished) {
+        const profile = useAuth.getState().profile;
+        const tier    = getAccessTier(profile as any);
+        const msg = tier === 'free'  ? t('day.completeMsgFree')
+                  : tier === 'trial' ? t('day.completeMsgTrial')
+                  :                    t('day.completeMsgPro');
+        showAlert(t('day.completeTitle'), msg, [{ text: t('day.closeBtn') }]);
+      }
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

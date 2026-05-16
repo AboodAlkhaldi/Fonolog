@@ -95,19 +95,35 @@ export default function TeacherSettings() {
         </>) : null}
       </View>
 
-      {/* Subscription */}
-      <Pressable style={styles.card} onPress={() => router.push('/settings/plan-details')}>
+      {/* Subscription — shows a placeholder popup in preview mode */}
+      <Pressable
+        style={[styles.card, impersonating ? styles.cardDisabled : null]}
+        onPress={() => {
+          if (impersonating) {
+            showAlert(
+              t('teacher.preview.planTitle'),
+              t('teacher.preview.planMsg'),
+            );
+            return;
+          }
+          router.push('/settings/plan-details');
+        }}
+      >
         <View style={styles.rowBetween}>
           <Text style={styles.cardTitle}>{t('settings.subscription')}</Text>
-          <Text style={styles.tag}>{subscriptionLabel(profile.subscription_status)}</Text>
+          <Text style={styles.tag}>
+            {impersonating ? '—' : subscriptionLabel(profile.subscription_status)}
+          </Text>
         </View>
-        {trialDays !== null ? (
-          <Text style={styles.cardDesc}>{t('settings.trialInfo', { days: trialDays })}</Text>
-        ) : profile.subscription_status === 'free' ? (
-          <Text style={styles.cardDesc}>{t('settings.freePlanDetails')}</Text>
-        ) : (
-          <Text style={styles.cardDesc}>{t('settings.activeDetails')}</Text>
-        )}
+        <Text style={styles.cardDesc}>
+          {impersonating
+            ? t('teacher.preview.planDesc')
+            : trialDays !== null
+              ? t('settings.trialInfo', { days: trialDays })
+              : profile.subscription_status === 'free'
+                ? t('settings.freePlanDetails')
+                : t('settings.activeDetails')}
+        </Text>
       </Pressable>
 
       <Pressable onPress={() => router.push('/settings/terms')} style={styles.actionRow}>
@@ -142,6 +158,7 @@ const styles = StyleSheet.create({
     padding: theme.spacing[4], borderRadius: theme.radius.lg,
     marginBottom: theme.spacing[3],
   },
+  cardDisabled: { opacity: 0.6 },
   cardTitle: { ...theme.typography.h4, color: theme.colors.text.primary },
   cardDesc:  { ...theme.typography.body, color: theme.colors.text.secondary, marginTop: theme.spacing[1] },
   label: { ...theme.typography.caption, color: theme.colors.text.muted, marginTop: theme.spacing[2] },

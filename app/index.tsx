@@ -2,14 +2,21 @@
  * Root index — when the user opens the app, they land here briefly before
  * useProtectedRoute redirects them to the correct group. We render nothing
  * to avoid a flash; the splash screen / status spinner covers it.
+ *
+ * Unauthenticated users go through the JS-rendered intro screen once per
+ * cold start before being redirected to welcome (see app/intro.tsx).
  */
 import { Redirect } from 'expo-router';
 import { useAuth } from '@/store/auth';
+import { introShownThisSession } from './intro';
 
 export default function Index() {
   const status = useAuth((s) => s.status);
 
   if (status === 'unauthenticated' || status === 'awaitingEmailVerify') {
+    if (!introShownThisSession) {
+      return <Redirect href="/intro" />;
+    }
     return <Redirect href="/(auth)/welcome" />;
   }
   if (status === 'needsRoleChoice') {
