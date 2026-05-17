@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AdminPreviewBanner } from '@/components/common/AdminPreviewBanner';
+import { OfflineBanner } from '@/components/common/OfflineBanner';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
@@ -15,6 +16,9 @@ export default function TabsLayout() {
   return (
     <View style={{ flex: 1 }}>
       <AdminPreviewBanner />
+      <View style={{ paddingHorizontal: theme.spacing[3] }}>
+        <OfflineBanner />
+      </View>
       <Tabs
         screenOptions={{
           headerShown: false,

@@ -5,9 +5,10 @@ import type { Word } from '../types/word.types'
 import type { Question } from '../types/module.types'
 import { shuffle, qid } from './utils'
 
-export function genKategori(words: Word[]): Question[] {
+export function genKategori(words: Word[], opts?: { targets?: Word[] }): Question[] {
+  const primary = opts?.targets ?? words
   const cats = [...new Set(words.map(w => w.kat))]
-  return shuffle(words).slice(0, 20).map((word, i) => ({
+  return shuffle(primary).slice(0, 20).map((word, i) => ({
     id:      qid('kt', i),
     word,
     options: shuffle(cats).slice(0, 4).includes(word.kat)

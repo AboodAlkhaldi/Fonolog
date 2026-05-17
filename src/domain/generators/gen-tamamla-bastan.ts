@@ -5,9 +5,10 @@ import type { Word } from '../types/word.types'
 import type { Question } from '../types/module.types'
 import { shuffle, qid } from './utils'
 
-export function genTamamlaBastan(words: Word[]): Question[] {
-  const multi = words.filter(w => w.n >= 2)
-  return shuffle(multi).slice(0, 20).map((word, i) => {
+export function genTamamlaBastan(words: Word[], opts?: { targets?: Word[] }): Question[] {
+  const multi   = words.filter(w => w.n >= 2)
+  const primary = (opts?.targets ?? words).filter(w => w.n >= 2)
+  return shuffle(primary).slice(0, 20).map((word, i) => {
     const ending = word.syl[word.syl.length - 1]
     const head   = word.syl.slice(0, -1).join('')   // e.g. "ka" for "kalem"
     const distractors = shuffle(

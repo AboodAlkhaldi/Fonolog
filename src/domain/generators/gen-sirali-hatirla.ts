@@ -7,8 +7,8 @@ import { shuffle, qid } from './utils'
 
 const GROUP_SIZE = 3
 
-export function genSiraliHatirla(words: Word[]): Question[] {
-  const pool = shuffle(words)
+export function genSiraliHatirla(words: Word[], opts?: { targets?: Word[] }): Question[] {
+  const pool = shuffle(opts?.targets ?? words)
   const questions: Question[] = []
   for (let i = 0; i + GROUP_SIZE <= pool.length && questions.length < 12; i += GROUP_SIZE) {
     const seq        = pool.slice(i, i + GROUP_SIZE)

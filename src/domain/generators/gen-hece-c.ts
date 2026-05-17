@@ -5,8 +5,9 @@ import type { Word } from '../types/word.types'
 import type { Question } from '../types/module.types'
 import { shuffle, qid } from './utils'
 
-export function genHeceC(words: Word[]): Question[] {
-  return shuffle(words).slice(0, 20).map((word, i) => {
+export function genHeceC(words: Word[], opts?: { targets?: Word[] }): Question[] {
+  const primary = opts?.targets ?? words
+  return shuffle(primary).slice(0, 20).map((word, i) => {
     const nums = ['1', '2', '3', '4', '5']
     const correct = String(word.n)
     const options = shuffle([correct, ...nums.filter(n => n !== correct).slice(0, 3)])

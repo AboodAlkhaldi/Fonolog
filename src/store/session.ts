@@ -21,6 +21,8 @@ import {
   markModuleComplete,
   DAY_COMPLETION_MIN_ACCURACY,
 } from '@/lib/day-progress';
+import { isOnline } from '@/lib/online-status';
+import { enqueue as enqueueOfflineWrite } from '@/lib/offline-queue';
 import { useAuth } from './auth';
 
 export type Verdict   = 'correct' | 'wrong' | null;
@@ -240,6 +242,24 @@ export const useSession = create<SessionState>((set, get) => ({
       word_ids:          wordIds,
     };
     if (extra.assignmentId) insertPayload.assignment_id = extra.assignmentId;
+
+    // Offline path: skip the direct insert + RPCs and queue the whole bundle
+    // for replay when the network comes back. This keeps XP/streaks/assignment
+    // completions from being lost when the student plays without connectivity.
+    if (!(await isOnline())) {
+      enqueueOfflineWrite({
+        kind: 'session_log',
+        payload: insertPayload,
+        followups: {
+          xp:       { amount: xp, reason: isPerfect ? 'sessionPerfect' : 'sessionComplete' },
+          streak:   true,
+          adaptive: { module_id: moduleId, level: adaptive.currentLevel },
+          ...(extra.assignmentId ? { /* assignment notif filled after fetching teacher_id which we don't have offline */ } : {}),
+        },
+      });
+      set({ xpEarned: xp });
+      return;
+    }
 
     const { data: logRow, error: logErr } = await supabase
       .from('session_logs')

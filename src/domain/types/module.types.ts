@@ -13,6 +13,17 @@ export interface Question {
   extra?:   Record<string, unknown>  // module-specific payload (e.g. wordA/wordB for audio-pair)
 }
 
+/**
+ * Optional second arg to every generator. The session layer uses `targets` to
+ * focus a teacher-assigned homework on a specific subset of words: the generator
+ * iterates `targets` for the "subject" of each question while still drawing
+ * distractors from the broader `words` pool. When `targets` is omitted the
+ * generator behaves identically to before.
+ */
+export interface GeneratorOptions {
+  targets?: Word[]
+}
+
 export interface ModuleDefinition {
   id:              string
   icon:            string
@@ -23,7 +34,7 @@ export interface ModuleDefinition {
   color:           string     // hex color for this module's theme
   level:           0 | 1 | 2 | 3 | 5
   screenType:      ScreenType
-  generator:       (words: Word[]) => Question[]
+  generator:       (words: Word[], options?: GeneratorOptions) => Question[]
   requiresPremium: boolean
   /** Modules that need TTS / mic / pronunciation grading. Always blocked in trial. */
   usesPronunciation?: boolean

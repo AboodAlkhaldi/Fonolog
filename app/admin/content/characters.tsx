@@ -9,6 +9,12 @@ import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
+const placeholderEmoji = (url: string | null | undefined, fallback = '✨') => {
+  if (!url || !url.startsWith('placeholder://')) return fallback;
+  const extracted = url.slice('placeholder://'.length);
+  return extracted || fallback;
+};
+
 type Tab = 'base' | 'extras' | 'cats';
 
 export default function AdminCharacters() {
@@ -72,7 +78,7 @@ export default function AdminCharacters() {
               style={styles.row}
               onPress={() => router.push(`/admin/content/character-edit/base/${item.id}`)}
             >
-              <View style={styles.thumb}><Text style={{ fontSize: 24 }}>🦁</Text></View>
+              <View style={styles.thumb}><Text style={{ fontSize: 24 }}>{placeholderEmoji(item.asset_url, '🦁')}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.name}</Text>
                 <Text style={styles.meta}>{t('admin.content.unlockXp', { xp: item.unlock_xp })}</Text>
@@ -92,7 +98,7 @@ export default function AdminCharacters() {
               style={styles.row}
               onPress={() => router.push(`/admin/content/character-edit/extra/${item.id}`)}
             >
-              <View style={styles.thumb}><Text style={{ fontSize: 18 }}>✨</Text></View>
+              <View style={styles.thumb}><Text style={{ fontSize: 18 }}>{placeholderEmoji(item.asset_url, '✨')}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.name}</Text>
                 <View style={{ flexDirection: 'row', gap: 4, marginTop: 4 }}>

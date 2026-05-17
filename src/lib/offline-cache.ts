@@ -9,7 +9,7 @@
  * what's available offline). 100 words is the same cap regardless of tier.
  */
 import { MMKV } from 'react-native-mmkv';
-import type { Category, Word } from '@/domain';
+import type { Category, Word, Profile } from '@/domain';
 
 const TTL_MS = 24 * 60 * 60 * 1000;
 export const OFFLINE_WORD_LIMIT = 100;
@@ -43,6 +43,26 @@ function set<T>(key: string, data: T): void {
   } catch { /* ignore */ }
 }
 
+// Profile cache: longer TTL than content (7 days) so an offline login can still
+// resolve a profile. We key by user id so the cache survives across users on
+// the same device without leaking.
+const PROFILE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function getProfile(userId: string): Profile | null {
+  try {
+    const raw = sGet(`profile:${userId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CacheEntry<Profile>;
+    if (Date.now() - parsed.cachedAt > PROFILE_TTL_MS) return null;
+    return parsed.data;
+  } catch { return null; }
+}
+
+function setProfile(p: Profile): void {
+  if (!p?.id) return;
+  sSet(`profile:${p.id}`, JSON.stringify({ data: p, cachedAt: Date.now() }));
+}
+
 export const offlineCache = {
   getCategories: () => get<Category[]>('categories'),
   setCategories: (c: Category[]) => set('categories', c),
@@ -51,5 +71,7 @@ export const offlineCache = {
   // repository hands us (currently `word_text` ASC), which keeps the offline
   // pool deterministic across cold starts.
   setWords:      (w: Word[]) => set('words', w.slice(0, OFFLINE_WORD_LIMIT)),
+  getProfile,
+  setProfile,
   clear:         () => { sDel('categories'); sDel('words'); },
 };

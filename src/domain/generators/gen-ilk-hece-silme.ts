@@ -5,8 +5,9 @@ import type { Word } from '../types/word.types'
 import type { Question } from '../types/module.types'
 import { shuffle, qid } from './utils'
 
-export function genIlkHeceSilme(words: Word[]): Question[] {
-  return shuffle(words.filter(w => w.n >= 2)).slice(0, 20).map((word, i) => {
+export function genIlkHeceSilme(words: Word[], opts?: { targets?: Word[] }): Question[] {
+  const primary = (opts?.targets ?? words).filter(w => w.n >= 2)
+  return shuffle(primary).slice(0, 20).map((word, i) => {
     const remaining = word.syl.slice(1).join('')
     return {
       id:      qid('ihs', i),

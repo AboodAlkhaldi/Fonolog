@@ -23,8 +23,9 @@ function wrongSyl(word: Word, correctStr: string): string[] {
   return [...variants].slice(0, 3)
 }
 
-export function genHecele(words: Word[]): Question[] {
-  return shuffle(words.filter(w => w.n >= 2)).slice(0, 20).map((word, i) => {
+export function genHecele(words: Word[], opts?: { targets?: Word[] }): Question[] {
+  const primary = (opts?.targets ?? words).filter(w => w.n >= 2)
+  return shuffle(primary).slice(0, 20).map((word, i) => {
     const correct = formatSyl(word.syl)
     const wrongs  = wrongSyl(word, correct)
     if (wrongs.length < 3) return null

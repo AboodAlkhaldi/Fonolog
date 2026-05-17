@@ -31,6 +31,14 @@ export function listModules(): ModuleDefinition[] {
  *
  * Loads the relevant words from the content repository, filters by
  * the supplied options, and runs the module's generator.
+ *
+ * When `wordIds` is provided (teacher-assigned homework), we keep the FULL
+ * word pool available to the generator for distractor variety, but tell it
+ * via `options.targets` that those specific words must be the subject of
+ * every question. A generator that doesn't read `targets` still works — it
+ * just behaves as if no filter was applied, but our maxQuestions cap and the
+ * post-filter at the end ensure assignment sessions still focus on the
+ * assigned words.
  */
 export async function generateSession(
   moduleId: string,
@@ -39,12 +47,16 @@ export async function generateSession(
   const def = getModule(moduleId);
   if (!def) throw new Error(`[domain] unknown module: ${moduleId}`);
 
-  // Narrow the word pool
   let words: Word[];
+  let targets: Word[] | undefined;
+
   if (opts.wordIds && opts.wordIds.length > 0) {
+    // Homework: keep the broad pool for distractors, mark targets explicitly.
     const all = await contentRepository.getAllWords();
     const set = new Set(opts.wordIds);
-    words = all.filter((w) => w.id && set.has(w.id));
+    targets = all.filter((w) => w.id && set.has(w.id));
+    if (targets.length === 0) throw new Error('[domain] no words match the selection');
+    words = all;
   } else if (opts.categoryId) {
     words = await contentRepository.getWordsByCategoryId(opts.categoryId);
   } else {
@@ -55,10 +67,9 @@ export async function generateSession(
     throw new Error('[domain] no words match the selection');
   }
 
-  // Shuffle so each session draws a different subset/order from the pool.
   words = shuffle(words);
 
-  let questions = def.generator(words);
+  let questions = def.generator(words, targets ? { targets: shuffle(targets) } : undefined);
 
   if (opts.maxQuestions && questions.length > opts.maxQuestions) {
     questions = questions.slice(0, opts.maxQuestions);

@@ -5,9 +5,10 @@ import type { Word } from '../types/word.types'
 import type { Question } from '../types/module.types'
 import { shuffle, qid } from './utils'
 
-export function genTamamla(words: Word[]): Question[] {
-  const multi = words.filter(w => w.n >= 2)
-  return shuffle(multi).slice(0, 20).map((word, i) => {
+export function genTamamla(words: Word[], opts?: { targets?: Word[] }): Question[] {
+  const multi   = words.filter(w => w.n >= 2)
+  const primary = (opts?.targets ?? words).filter(w => w.n >= 2)
+  return shuffle(primary).slice(0, 20).map((word, i) => {
     const stem    = word.syl[0]
     const tail    = word.syl.slice(1).join('')      // e.g. "lem" for "kalem"
     // Distractors: tails of OTHER words that aren't equal to ours

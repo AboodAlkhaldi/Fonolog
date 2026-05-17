@@ -5,8 +5,9 @@ import type { Word } from '../types/word.types'
 import type { Question } from '../types/module.types'
 import { shuffle, qid } from './utils'
 
-export function genAyirtEtme(words: Word[]): Question[] {
-  return shuffle(words).slice(0, 20).map((target, i) => {
+export function genAyirtEtme(words: Word[], opts?: { targets?: Word[] }): Question[] {
+  const primary = opts?.targets ?? words
+  return shuffle(primary).slice(0, 20).map((target, i) => {
     const sameFirst = words.filter(w => w.first === target.first && w.word !== target.word)
     const diffFirst = words.filter(w => w.first !== target.first)
     if (sameFirst.length < 1 || diffFirst.length < 3) {

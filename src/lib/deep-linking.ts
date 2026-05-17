@@ -40,16 +40,51 @@ function parseRecoveryTokens(url: string): RecoveryTokens | null {
   return { access_token, refresh_token };
 }
 
+function parseAuthTokens(url: string): { access_token: string; refresh_token: string; type: string } | null {
+  // Same parser as recovery, but type-agnostic (signup confirmation also delivers tokens).
+  const hashIdx  = url.indexOf('#');
+  const queryIdx = url.indexOf('?');
+  const fragment = hashIdx  >= 0 ? url.slice(hashIdx + 1) : '';
+  const query    = queryIdx >= 0
+    ? url.slice(queryIdx + 1, hashIdx > queryIdx ? hashIdx : undefined)
+    : '';
+  const source = fragment || query;
+  if (!source) return null;
+  const params = new URLSearchParams(source);
+  const access_token  = params.get('access_token')  ?? '';
+  const refresh_token = params.get('refresh_token') ?? '';
+  const type          = params.get('type')          ?? '';
+  if (!access_token || !refresh_token) return null;
+  return { access_token, refresh_token, type };
+}
+
 /**
  * Wires Linking events to Supabase session restoration.
- * `onRecovery` is invoked after setSession succeeds for a recovery link.
+ * `onRecovery` is invoked after setSession succeeds for a password-recovery link.
+ * `onVerified` is invoked after setSession succeeds for a signup-confirmation link.
  * Returns a teardown function.
  */
-export function setupDeepLinks(onRecovery: () => void): () => void {
+export function setupDeepLinks(
+  onRecovery: () => void,
+  onVerified?: () => void,
+): () => void {
   const handle = async (url: string | null) => {
     if (!url) return;
-    // Only handle our reset-password deep link. Other links (push notifications
-    // routing, etc.) are processed elsewhere.
+
+    // ── Signup confirmation: okuma://verified?...&type=signup ──
+    if (url.includes('verified')) {
+      const tokens = parseAuthTokens(url);
+      if (!tokens || (tokens.type && tokens.type !== 'signup')) return;
+      const { error } = await supabase.auth.setSession({
+        access_token:  tokens.access_token,
+        refresh_token: tokens.refresh_token,
+      });
+      if (error) { console.warn('[deep-link] setSession (signup) failed:', error); return; }
+      onVerified?.();
+      return;
+    }
+
+    // ── Password recovery ──
     if (!url.includes('reset-password')) return;
 
     const tokens = parseRecoveryTokens(url);

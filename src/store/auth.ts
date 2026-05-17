@@ -19,6 +19,8 @@ import { supabase } from '@/lib/supabase';
 import { AppError } from '@/lib/error';
 import { translateAuthError } from '@/lib/auth-errors';
 import { setupDeepLinks } from '@/lib/deep-linking';
+import { offlineCache } from '@/lib/offline-cache';
+import { flushQueue } from '@/lib/offline-queue';
 import type { ProfileRow } from '@/lib/database.types';
 
 export type AuthStatus =
@@ -98,12 +100,20 @@ export const useAuth = create<AuthState>((set, get) => ({
       let profile: Profile | null = null;
 
       if (session?.user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle();
-        profile = (data as Profile) ?? null;
+        try {
+          const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          profile = (data as Profile) ?? null;
+          if (profile) offlineCache.setProfile(profile);
+        } catch (fetchErr) {
+          // Offline: fall back to the cached profile so the user can still
+          // open the app, browse cached content, and have writes queued.
+          console.warn('[auth] profile fetch failed, using cache:', fetchErr);
+          profile = offlineCache.getProfile(session.user.id);
+        }
       }
 
       const derived = deriveStatus(session, profile);
@@ -113,6 +123,9 @@ export const useAuth = create<AuthState>((set, get) => ({
         profile,
         status: derived === 'loading' ? 'unauthenticated' : derived,
       });
+
+      // Drain any pending offline writes now that we're back online (best-effort).
+      flushQueue().catch(() => { /* ignore */ });
     } catch (e) {
       console.error('[auth] initialize failed:', e);
       set({ status: 'unauthenticated', session: null, user: null, profile: null });
@@ -122,9 +135,14 @@ export const useAuth = create<AuthState>((set, get) => ({
     // install the session. After that, flip status so the protected route
     // navigates to /reset-password. This is needed because on native we run
     // with detectSessionInUrl: false, so Supabase does not auto-handle the URL.
-    setupDeepLinks(() => {
-      set({ status: 'needsPasswordReset' });
-    });
+    setupDeepLinks(
+      () => { set({ status: 'needsPasswordReset' }); },
+      () => {
+        // Signup confirmation: refresh profile and let deriveStatus route the
+        // user to role-choice / dashboard. The setSession in deep-linking.ts
+        // already installed the session, which will trigger onAuthStateChange.
+      },
+    );
 
     supabase.auth.onAuthStateChange(async (event, newSession) => {
       // Password recovery deep link → route to reset-password page.
@@ -181,7 +199,10 @@ export const useAuth = create<AuthState>((set, get) => ({
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: { full_name: fullName },
+        emailRedirectTo: 'okuma://verified',
+      },
     });
     if (error) throw new AppError(translateAuthError(error), (error as any)?.code);
 
@@ -222,6 +243,8 @@ export const useAuth = create<AuthState>((set, get) => ({
       throw new AppError('Bu hesap devre dışı bırakıldı. Yeniden kayıt olarak hesabınızı geri yükleyebilirsiniz.');
     }
 
+    if (profile) offlineCache.setProfile(profile);
+
     const derived = deriveStatus(data.session, profile);
     set({
       session: data.session,
@@ -229,6 +252,9 @@ export const useAuth = create<AuthState>((set, get) => ({
       profile,
       status: derived === 'loading' ? 'needsRoleChoice' : derived,
     });
+
+    // Drain offline-queued writes now that we're online again.
+    flushQueue().catch(() => { /* ignore */ });
   },
 
   deactivateAccount: async () => {
@@ -265,7 +291,9 @@ export const useAuth = create<AuthState>((set, get) => ({
     const { user, session } = get();
     if (!user) return;
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-    set({ profile: data as Profile, status: deriveStatus(session, data as Profile) });
+    const profile = data as Profile;
+    if (profile) offlineCache.setProfile(profile);
+    set({ profile, status: deriveStatus(session, profile) });
   },
 
   chooseRole: async (role) => {

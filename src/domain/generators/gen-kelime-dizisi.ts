@@ -7,8 +7,10 @@ import { shuffle, qid } from './utils'
 
 const GROUP_SIZE = 3
 
-export function genKelimeDizisi(words: Word[]): Question[] {
-  const pool = shuffle(words)
+export function genKelimeDizisi(words: Word[], opts?: { targets?: Word[] }): Question[] {
+  // Pull sequence groups from targets when provided so the assigned words are
+  // what the student has to hold in memory; pad distractors from the broad pool.
+  const pool = shuffle(opts?.targets ?? words)
   const questions: Question[] = []
   for (let i = 0; i + GROUP_SIZE <= pool.length && questions.length < 12; i += GROUP_SIZE) {
     const seq        = pool.slice(i, i + GROUP_SIZE)
