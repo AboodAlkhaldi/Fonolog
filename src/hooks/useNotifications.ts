@@ -1,83 +1,29 @@
 /**
- * Notifications hook — loads the current user's inbox, subscribes to realtime
- * inserts/updates, and exposes mark-as-read helpers.
+ * Notifications hook — thin wrapper around the shared notifications store.
  *
- * Backed by the `notifications` table (RLS: receiver-only). New rows from
- * send-push or assignment-creation arrive within ~1s via Supabase Realtime.
+ * Every component that needs notifications data (bell, inbox list, detail
+ * subpage) goes through this hook. State lives in `useNotificationsStore`
+ * so mutations from one screen show up in the others instantly without a
+ * round-trip to Supabase Realtime.
  */
-import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useEffect } from 'react';
 import { useAuth } from '@/store/auth';
-import type { NotificationRow } from '@/lib/database.types';
-
-interface State {
-  notifications: NotificationRow[];
-  unreadCount:   number;
-  loading:       boolean;
-}
+import { useNotificationsStore } from '@/store/notifications';
 
 export function useNotifications() {
-  const userId = useAuth((s) => s.user?.id);
-  const [state, setState] = useState<State>({ notifications: [], unreadCount: 0, loading: true });
+  const userId        = useAuth((s) => s.user?.id);
+  const notifications = useNotificationsStore((s) => s.notifications);
+  const unreadCount   = useNotificationsStore((s) => s.unreadCount);
+  const loading       = useNotificationsStore((s) => s.loading);
+  const load          = useNotificationsStore((s) => s.load);
+  const reload        = useNotificationsStore((s) => s.reload);
+  const markRead      = useNotificationsStore((s) => s.markRead);
+  const markAllRead   = useNotificationsStore((s) => s.markAllRead);
 
-  const reload = useCallback(async () => {
-    if (!userId) return;
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(50);
-    const rows = (data ?? []) as NotificationRow[];
-    setState({
-      notifications: rows,
-      unreadCount: rows.filter((n) => !n.read_at).length,
-      loading: false,
-    });
-  }, [userId]);
-
-  // Initial load
   useEffect(() => {
     if (!userId) return;
-    reload();
-  }, [userId, reload]);
+    void load(userId);
+  }, [userId, load]);
 
-  // Realtime: new + updated rows for this user
-  useEffect(() => {
-    if (!userId) return;
-    const channel = supabase
-      .channel(`notifications:${userId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-        () => { reload(); },
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [userId, reload]);
-
-  const markRead = useCallback(async (id: string) => {
-    await supabase
-      .from('notifications')
-      .update({ read_at: new Date().toISOString() } as any)
-      .eq('id', id);
-    // optimistic update — realtime will follow up
-    setState((s) => ({
-      ...s,
-      notifications: s.notifications.map((n) => n.id === id ? { ...n, read_at: new Date().toISOString() } : n),
-      unreadCount: Math.max(0, s.unreadCount - 1),
-    }));
-  }, []);
-
-  const markAllRead = useCallback(async () => {
-    if (!userId) return;
-    await supabase
-      .from('notifications')
-      .update({ read_at: new Date().toISOString() } as any)
-      .eq('user_id', userId)
-      .is('read_at', null);
-    reload();
-  }, [userId, reload]);
-
-  return { ...state, reload, markRead, markAllRead };
+  return { notifications, unreadCount, loading, reload, markRead, markAllRead };
 }

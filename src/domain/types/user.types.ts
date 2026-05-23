@@ -1,24 +1,15 @@
-export type UserRole = 'student' | 'teacher' | 'admin'
-
-export type SubscriptionStatus = 'free' | 'trial' | 'active' | 'student' | 'expert'
-
-export interface Profile {
-  id:                  string
-  role:                UserRole
-  full_name:           string
-  display_name:        string | null
-  date_of_birth:       string | null
-  avatar_color:        string
-  device_push_token:   string | null
-  subscription_status: SubscriptionStatus
-  subscription_expires: string | null
-  revenuecat_id:       string | null
-  email_verified:      boolean
-  streak_count:        number
-  last_active_date:    string | null
-  created_at:          string
-  updated_at:          string
-}
+/**
+ * Domain re-export of the user/profile types.
+ *
+ * The legacy domain `Profile` shape (`display_name`, `date_of_birth`,
+ * `avatar_color`, `revenuecat_id`, ...) was from Stage 0 and no longer
+ * matches the DB. The actual DB shape lives in `src/lib/database.types.ts`
+ * as `ProfileRow`. We re-export it under the historical `Profile` name so
+ * older imports (`import type { Profile } from '@/domain'`) keep working
+ * without a codebase-wide rename.
+ */
+export type { ProfileRow as Profile } from '@/lib/database.types'
+export type { UserRole, SubscriptionStatus } from '@/lib/database.types'
 
 export interface TeacherStudent {
   id:           string
@@ -47,6 +38,8 @@ export type EntitlementKey =
   | 'homework_system'
   | 'word_management'
   | 'teacher_pdf'
+
+import type { SubscriptionStatus } from '@/lib/database.types'
 
 export const SUBSCRIPTION_ENTITLEMENTS: Record<SubscriptionStatus, EntitlementKey[]> = {
   free: [],

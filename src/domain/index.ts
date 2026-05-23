@@ -50,6 +50,4 @@ export {
   wordsFromRows,
   categoryFromRow,
   profileFromRow,
-  characterItemFromRow,
-  studentCharacterFromRow,
 } from './adapters';

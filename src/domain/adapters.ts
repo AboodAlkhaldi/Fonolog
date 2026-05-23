@@ -12,16 +12,12 @@ import type {
   WordRow,
   CategoryRow,
   ProfileRow,
-  CharacterItemRow,
-  StudentCharacterRow,
 } from '@/lib/database.types';
 
 import type {
   Word,
   Category,
   Profile,
-  CharacterItem,
-  StudentCharacter,
 } from './types';
 
 // ─── Word ──────────────────────────────────────────────
@@ -74,57 +70,14 @@ export function categoryFromRow(row: CategoryRow): Category {
 
 // ─── Profile ───────────────────────────────────────────
 /**
- * Note: this domain Profile is the legacy spec shape from Stage 0.
- * The DB row uses fewer fields. We fill in defaults for the rest.
+ * `Profile` is now an alias for `ProfileRow` (see types/user.types.ts).
+ * The row-to-domain conversion is a no-op identity now; kept as a function
+ * because callers may still spread / re-shape via this entry point.
  */
 export function profileFromRow(row: ProfileRow): Profile {
-  return {
-    id:                  row.id,
-    role:                row.role,
-    full_name:           row.full_name,
-    display_name:        null,
-    date_of_birth:       null,
-    avatar_color:        '#FFC857',
-    device_push_token:   null,
-    subscription_status: row.subscription_status,
-    subscription_expires: row.subscription_expires,
-    revenuecat_id:       null,
-    email_verified:      true,   // if we have a profile row, signup completed
-    streak_count:        0,
-    last_active_date:    null,
-    created_at:          row.created_at,
-    updated_at:          row.updated_at,
-  };
+  return row;
 }
 
-// ─── Character item ────────────────────────────────────
-export function characterItemFromRow(row: CharacterItemRow): CharacterItem {
-  return {
-    id:          row.id,
-    item_type:   row.slot,
-    name:        row.name,
-    description: row.description,
-    image_url:   row.asset_path,
-    unlock_xp:   row.unlock_xp,
-    rarity:      row.rarity,
-    is_premium:  false,           // catalog-wide premium gating not in MVP
-    sort_order:  row.display_order,
-  };
-}
-
-// ─── Student character ─────────────────────────────────
-export function studentCharacterFromRow(row: StudentCharacterRow): StudentCharacter {
-  return {
-    id:             row.student_id,    // 1:1 mapping; PK is student_id
-    student_id:     row.student_id,
-    total_xp:       row.total_xp,
-    level:          row.level,
-    unlocked_items: [],                // computed from total_xp + items.unlock_xp on read
-    equipped_hat:   row.equipped_hat,
-    equipped_shirt: row.equipped_shirt,
-    equipped_shoes: row.equipped_shoes,
-    equipped_acc:   row.equipped_acc,
-    equipped_bg:    row.equipped_bg,
-    updated_at:     row.updated_at,
-  };
-}
+// Character / student-character adapters removed in v2 — the slot-based
+// model was retired in favor of a base + variant model. Components now read
+// the row shape directly via supabase.from('student_character').
