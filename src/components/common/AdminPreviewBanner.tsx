@@ -5,10 +5,11 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/store/auth';
-import { setAdminPreviewTier, getAccessTier } from '@/lib/access-tier';
+import { setAdminPreviewTier } from '@/lib/access-tier';
 import { supabase } from '@/lib/supabase';
 import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
+import { t } from '@/i18n';
 
 /**
  * Shows at the top of the screen while admin/teacher is in preview mode.
@@ -23,8 +24,14 @@ export function AdminPreviewBanner() {
   const insets         = useSafeAreaInsets();
   const [remaining, setRemaining] = useState<number | null>(null);
 
-  const tier = getAccessTier(profile as any);
-  const isUnlimited = role === 'admin' || tier === 'subscribed';
+  // Read the user's REAL subscription status directly. Using getAccessTier()
+  // here is a trap because we ourselves call setAdminPreviewTier('subscribed')
+  // a few lines below to make the previewed content look like a paid student —
+  // which would feed back into getAccessTier and make every teacher look
+  // "subscribed" to this component, hiding the 20-min cap UI.
+  const sub = profile?.subscription_status as string | null | undefined;
+  const isPaidPlan = sub === 'active' || sub === 'student' || sub === 'expert';
+  const isUnlimited = role === 'admin' || isPaidPlan;
 
   // Set the access tier override based on what's being previewed
   useEffect(() => {
@@ -54,9 +61,9 @@ export function AdminPreviewBanner() {
       setRemaining(remainingMin);
       if (!allowed) {
         showAlert(
-          'Süren doldu',
-          'Bugünkü 20 dakikalık öğrenci görünümü süreni doldurdun. Yarın tekrar dene.',
-          [{ text: 'Tamam', onPress: handleExit }],
+          t('teacher.preview.limitReachedTitle'),
+          t('teacher.preview.limitReachedMsg'),
+          [{ text: t('app.ok'), onPress: handleExit }],
         );
       }
     };
@@ -82,10 +89,12 @@ export function AdminPreviewBanner() {
       <Text style={styles.text}>
         Önizleme modu
         {isUnlimited
-          ? ' · Sınırsız'
+          ? ' · ♾ Sınırsız'
           : role === 'teacher' && remaining !== null
-            ? ` · ${remaining} dk kaldı`
-            : ''}
+            ? ` · ⏱ 20 dk · ${remaining} dk kaldı`
+            : role === 'teacher'
+              ? ' · ⏱ 20 dk/gün'
+              : ''}
       </Text>
       <Pressable onPress={handleExit} hitSlop={10} style={styles.exitBtn}>
         <Text style={styles.exitText}>Çık</Text>
