@@ -10,14 +10,15 @@ import { getModule } from '@/domain';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
-interface Assignment {
+interface Homework {
   id:           string;
   title:        string;
   instructions: string | null;
-  status:       string;
-  module_ids:   string[];
+  status:       'assigned' | 'completed' | 'overdue';
+  module_id:    string;
   word_ids:     string[];
   teacher_id:   string;
+  due_at:       string;
   completed_at: string | null;
 }
 
@@ -30,49 +31,45 @@ export default function AssignmentDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const start = useSession((s) => s.start);
 
-  const [assignment, setAssignment] = useState<Assignment | null>(null);
-  const [teacher, setTeacher]       = useState<TeacherInfo | null>(null);
-  const [pickedModuleId, setPicked] = useState<string | null>(null);
+  const [homework, setHomework] = useState<Homework | null>(null);
+  const [teacher,  setTeacher]  = useState<TeacherInfo | null>(null);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       if (!id) return;
       const { data } = await supabase
-        .from('assignments')
-        .select('id, title, instructions, status, module_ids, word_ids, teacher_id, completed_at')
+        .from('homeworks')
+        .select('id, title, instructions, status, module_id, word_ids, teacher_id, due_at, completed_at')
         .eq('id', id)
         .maybeSingle();
       if (!alive) return;
-      setAssignment(data as Assignment | null);
+      setHomework(data as Homework | null);
 
       if (data?.teacher_id) {
-        const { data: t } = await supabase
+        const { data: tProfile } = await supabase
           .from('profiles')
           .select('full_name, child_avatar_emoji')
           .eq('id', data.teacher_id)
           .maybeSingle();
-        if (alive) setTeacher(t as TeacherInfo | null);
+        if (alive) setTeacher(tProfile as TeacherInfo | null);
       }
-
-      if (data?.module_ids?.length === 1) setPicked(data.module_ids[0]);
     })();
     return () => { alive = false; };
   }, [id]);
 
-  if (!assignment) return <Screen><Loading /></Screen>;
+  if (!homework) return <Screen><Loading /></Screen>;
 
-  const isCompleted = assignment.status === 'completed';
-  const modules = (assignment.module_ids ?? [])
-    .map((mid) => getModule(mid))
-    .filter((m): m is NonNullable<typeof m> => Boolean(m));
+  const isCompleted = homework.status === 'completed';
+  const isOverdue   = homework.status === 'overdue';
+  const mod         = getModule(homework.module_id);
 
-  const onStart = async (moduleId: string) => {
-    await start(moduleId, {
-      assignmentId: assignment.id,
-      wordIds:      assignment.word_ids,
+  const onStart = async () => {
+    await start(homework.module_id, {
+      assignmentId: homework.id,
+      wordIds:      homework.word_ids,
     });
-    router.push(`/session/${moduleId}`);
+    router.push(`/session/${homework.module_id}`);
   };
 
   return (
@@ -84,9 +81,11 @@ export default function AssignmentDetail() {
       <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing[6] }}>
         <View style={styles.header}>
           <Text style={styles.emoji}>📋</Text>
-          <Text style={styles.title}>{assignment.title}</Text>
+          <Text style={styles.title}>{homework.title}</Text>
           {isCompleted ? (
             <Badge label={t('learn.assignment.completed')} variant="success" />
+          ) : isOverdue ? (
+            <Badge label={t('learn.assignment.overdue')} variant="warning" />
           ) : (
             <Badge label={t('learn.assignment.pending')} variant="warning" />
           )}
@@ -99,45 +98,38 @@ export default function AssignmentDetail() {
           </View>
         ) : null}
 
-        {assignment.instructions ? (
+        {homework.instructions ? (
           <View style={styles.messageCard}>
             <Ionicons name="chatbubble-outline" size={18} color={theme.colors.brand.secondaryHover} />
             <View style={{ flex: 1 }}>
               <Text style={styles.messageLabel}>{t('learn.assignment.messageLabel')}</Text>
-              <Text style={styles.messageBody}>{assignment.instructions}</Text>
+              <Text style={styles.messageBody}>{homework.instructions}</Text>
             </View>
           </View>
         ) : null}
 
-        <Text style={styles.section}>{t('learn.assignment.modules', { count: modules.length })}</Text>
+        <Text style={styles.section}>{t('learn.assignment.gameLabel')}</Text>
 
-        {modules.map((m) => {
-          const selected = pickedModuleId === m.id;
-          return (
-            <Pressable
-              key={m.id}
-              style={[styles.moduleCard, selected && styles.moduleCardSelected]}
-              onPress={() => setPicked(m.id)}
-            >
-              <Text style={{ fontSize: 28 }}>{m.icon}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.moduleTitle}>{m.title}</Text>
-                <Text style={styles.moduleDesc}>{m.description}</Text>
-              </View>
-              {selected ? (
-                <Ionicons name="checkmark-circle" size={24} color={theme.colors.brand.primary} />
-              ) : null}
-            </Pressable>
-          );
-        })}
+        {mod ? (
+          <View style={styles.moduleCard}>
+            <Text style={{ fontSize: 28 }}>{mod.icon}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.moduleTitle}>{mod.title}</Text>
+              <Text style={styles.moduleDesc}>{mod.description}</Text>
+              <Text style={styles.wordCount}>{t('learn.assignment.wordCount', { count: homework.word_ids.length })}</Text>
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.moduleDesc}>{t('learn.assignment.moduleMissing')}</Text>
+        )}
 
         <Button
           label={isCompleted ? t('results.playAgain') : t('learn.assignment.startBtn')}
           variant="cta"
           size="lg"
           fullWidth
-          disabled={!pickedModuleId}
-          onPress={() => pickedModuleId && onStart(pickedModuleId)}
+          disabled={!mod || isOverdue}
+          onPress={onStart}
           style={{ marginTop: theme.spacing[5] }}
         />
       </ScrollView>
@@ -169,9 +161,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.secondary,
     padding: theme.spacing[3], borderRadius: theme.radius.lg,
     marginBottom: theme.spacing[2],
-    borderWidth: 2, borderColor: 'transparent',
+    borderWidth: 2, borderColor: theme.colors.brand.primary,
   },
-  moduleCardSelected: { borderColor: theme.colors.brand.primary },
   moduleTitle: { ...theme.typography.bodyLarge, color: theme.colors.text.primary },
   moduleDesc:  { ...theme.typography.bodySmall, color: theme.colors.text.muted, marginTop: 2 },
+  wordCount:   { ...theme.typography.caption, color: theme.colors.brand.primary, marginTop: 4 },
 });

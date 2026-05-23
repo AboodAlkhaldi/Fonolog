@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,33 +15,38 @@ const placeholderEmoji = (url: string | null | undefined, fallback = '✨') => {
   return extracted || fallback;
 };
 
-type Tab = 'base' | 'extras' | 'cats';
+type Tab = 'base' | 'variants';
+
+interface BaseRow { id: string; name: string; asset_url: string; unlock_xp: number }
+interface VariantRow {
+  id: string; base_character_id: string;
+  name: string; asset_url: string; unlock_xp: number;
+  rarity: string;
+}
 
 export default function AdminCharacters() {
   const [tab, setTab] = useState<Tab>('base');
-  const [bases,  setBases]  = useState<any[]>([]);
-  const [extras, setExtras] = useState<any[]>([]);
-  const [cats,   setCats]   = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [bases,    setBases]    = useState<BaseRow[]>([]);
+  const [variants, setVariants] = useState<VariantRow[]>([]);
+  const [loading,  setLoading]  = useState(true);
 
   const load = async () => {
-    const [b, x, c] = await Promise.all([
+    const [b, x] = await Promise.all([
       supabase.from('characters_base').select('*').order('display_order'),
-      supabase.from('character_extras').select('*').order('unlock_xp'),
-      supabase.from('character_extra_categories').select('*').order('display_order'),
+      supabase.from('character_extras').select('*').order('base_character_id, display_order'),
     ]);
-    setBases(b.data ?? []);
-    setExtras(x.data ?? []);
-    setCats(c.data ?? []);
+    setBases((b.data ?? []) as BaseRow[]);
+    setVariants((x.data ?? []) as VariantRow[]);
     setLoading(false);
   };
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
+  const baseNameMap = Object.fromEntries(bases.map((b) => [b.id, b.name]));
+
   const onAdd = () => showAlert(t('admin.content.addTitle'), '', [
-    { text: t('admin.content.addBaseChar'),  onPress: () => router.push('/admin/content/character-edit/base/new') },
-    { text: t('admin.content.addCatChar'),   onPress: () => router.push('/admin/content/character-edit/cat/new') },
-    { text: t('admin.content.addExtraChar'), onPress: () => router.push('/admin/content/character-edit/extra/new') },
+    { text: t('admin.content.addBaseChar'),   onPress: () => router.push('/admin/content/character-edit/base/new' as any) },
+    { text: t('admin.content.addVariant'),    onPress: () => router.push('/admin/content/character-edit/variant/new' as any) },
     { text: t('app.cancel'), style: 'cancel' },
   ]);
 
@@ -59,11 +64,11 @@ export default function AdminCharacters() {
       <Button label={t('admin.content.addBtn')} variant="primary" size="md" fullWidth onPress={onAdd} />
 
       <View style={styles.tabs}>
-        {(['base','extras','cats'] as const).map((tabKey) => (
+        {(['base','variants'] as const).map((tabKey) => (
           <Pressable key={tabKey} onPress={() => setTab(tabKey)}
                      style={[styles.tab, tab === tabKey && styles.tabActive]}>
             <Text style={[styles.tabText, tab === tabKey && styles.tabTextActive]}>
-              {tabKey === 'base' ? t('admin.content.tabBase') : tabKey === 'extras' ? t('admin.content.tabExtras') : t('admin.content.tabCats')}
+              {tabKey === 'base' ? t('admin.content.tabBase') : t('admin.content.tabVariants')}
             </Text>
           </Pressable>
         ))}
@@ -76,7 +81,7 @@ export default function AdminCharacters() {
           renderItem={({ item }) => (
             <Pressable
               style={styles.row}
-              onPress={() => router.push(`/admin/content/character-edit/base/${item.id}`)}
+              onPress={() => router.push(`/admin/content/character-edit/base/${item.id}` as any)}
             >
               <View style={styles.thumb}><Text style={{ fontSize: 24 }}>{placeholderEmoji(item.asset_url, '🦁')}</Text></View>
               <View style={{ flex: 1 }}>
@@ -89,41 +94,26 @@ export default function AdminCharacters() {
         />
       )}
 
-      {tab === 'extras' && (
+      {tab === 'variants' && (
         <FlatList
-          data={extras}
-          keyExtractor={(e) => e.id}
+          data={variants}
+          keyExtractor={(v) => v.id}
           renderItem={({ item }) => (
             <Pressable
               style={styles.row}
-              onPress={() => router.push(`/admin/content/character-edit/extra/${item.id}`)}
+              onPress={() => router.push(`/admin/content/character-edit/variant/${item.id}` as any)}
             >
-              <View style={styles.thumb}><Text style={{ fontSize: 18 }}>{placeholderEmoji(item.asset_url, '✨')}</Text></View>
+              <View style={styles.thumb}><Text style={{ fontSize: 22 }}>{placeholderEmoji(item.asset_url, '✨')}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.name}</Text>
-                <View style={{ flexDirection: 'row', gap: 4, marginTop: 4 }}>
-                  <Badge label={item.category_id} variant="info" />
+                <View style={{ flexDirection: 'row', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                  <Badge label={baseNameMap[item.base_character_id] ?? item.base_character_id} variant="info" />
                   <Badge label={item.rarity} variant="warning" />
                   <Badge label={`${item.unlock_xp} XP`} variant="success" />
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={18} color={theme.colors.text.muted} />
             </Pressable>
-          )}
-        />
-      )}
-
-      {tab === 'cats' && (
-        <FlatList
-          data={cats}
-          keyExtractor={(c) => c.id}
-          renderItem={({ item }) => (
-            <View style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.meta}>ID: {item.id}</Text>
-              </View>
-            </View>
           )}
         />
       )}

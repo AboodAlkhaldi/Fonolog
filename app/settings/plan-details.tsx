@@ -9,10 +9,9 @@ import { useAuth } from '@/store/auth';
 import { getAccessTier, trialDaysRemaining, subscriptionLabel } from '@/lib/access-tier';
 import { differenceInCalendarDays } from 'date-fns';
 import { getPricing, formatPrice, type PricingRow } from '@/lib/pricing';
+import { SUPPORT_EMAIL, supportMailto } from '@/lib/contact';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
-
-const SUPPORT_EMAIL = 'alisaglam@gmail.com';
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -48,23 +47,24 @@ export default function PlanDetails() {
 
   if (loading) return <Screen><Loading /></Screen>;
 
-  const expiryDaysLeft = (() => {
-    const iso = activeEntitlement?.expirationDate ?? profile?.subscription_expires ?? null;
-    if (!iso) return null;
-    const days = differenceInCalendarDays(new Date(iso), new Date());
-    return days >= 0 && days <= 5 ? days : null;
-  })();
-
   const activeEntitlement =
-    customerInfo?.entitlements.active['okuma_expert'] ??
-    customerInfo?.entitlements.active['okuma_student'] ??
+    customerInfo?.entitlements.active['fonolog_teacher'] ??
+    customerInfo?.entitlements.active['fonolog_student'] ??
     null;
 
   const productId = activeEntitlement?.productIdentifier ?? null;
   const planRow = pricing.find((p) => p.product_id === productId) ?? null;
 
-  const expiresIso = activeEntitlement?.expirationDate ?? profile?.subscription_expires ?? null;
-  const willRenew  = activeEntitlement?.willRenew ?? false;
+  // DB is the only source of truth for expiry under the no-auto-renewal
+  // model. Don't peek at RC's customerInfo cache here — it can lag and it
+  // was the source of stale-date bugs we already fixed.
+  const expiresIso = profile?.subscription_expires ?? null;
+
+  const expiryDaysLeft = (() => {
+    if (!expiresIso) return null;
+    const days = differenceInCalendarDays(new Date(expiresIso), new Date());
+    return days >= 0 && days <= 5 ? days : null;
+  })();
 
   const statusLabel =
     tier === 'admin'
@@ -98,15 +98,28 @@ export default function PlanDetails() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.label}>{willRenew ? t('planDetails.renewLabel') : t('planDetails.expiresLabel')}</Text>
+          {/* Under the no-auto-renewal model `willRenew` from RC is always
+              false; we always label this as the expiry date. */}
+          <Text style={styles.label}>{t('planDetails.expiresLabel')}</Text>
           <Text style={styles.value}>{formatDate(expiresIso)}</Text>
           {trialDays !== null ? (
             <Text style={styles.metaLine}>{t('planDetails.trialRemaining', { days: trialDays })}</Text>
           ) : null}
         </View>
 
-        {/* Expiry warning — shown when plan expires in ≤5 days and won't auto-renew */}
-        {expiryDaysLeft !== null && !willRenew && (
+        {/* No-auto-renewal disclaimer — visible to subscribed users so they
+            know they won't be silently charged again at period end. */}
+        {tier === 'subscribed' ? (
+          <View style={styles.noAutoRenewCard}>
+            <Ionicons name="shield-checkmark-outline" size={18} color={theme.colors.feedback.successText} />
+            <Text style={styles.noAutoRenewText}>{t('paywall.noAutoRenewNote')}</Text>
+          </View>
+        ) : null}
+
+        {/* Expiry warning — shown when plan expires in ≤5 days. There's no
+            auto-renew under the new model, so we always show it once the
+            window is close. */}
+        {expiryDaysLeft !== null && (
           <View style={styles.expiryWarning}>
             <Ionicons name="warning-outline" size={18} color={theme.colors.feedback.warningText} />
             <Text style={styles.expiryWarningText}>
@@ -117,9 +130,17 @@ export default function PlanDetails() {
           </View>
         )}
 
-        {(tier !== 'subscribed' || (expiryDaysLeft !== null && !willRenew)) ? (
+        {/* CTA: always show for trial/free (upgrade), and for subscribed users
+            who are within 5 days of expiry (renew before lapse). Subscribed
+            users far from expiry don't need a button — they're set. */}
+        {(tier !== 'subscribed' || expiryDaysLeft !== null) ? (
           <Button
-            label={tier === 'trial' ? t('planDetails.upgradeTrial') : expiryDaysLeft !== null ? t('planDetails.renewNow') : t('planDetails.upgradeFree')}
+            label={
+              tier === 'trial'           ? t('planDetails.upgradeTrial')
+              : tier === 'subscribed'    ? t('paywall.renewBtn')
+              : expiryDaysLeft !== null  ? t('planDetails.renewNow')
+              :                            t('planDetails.upgradeFree')
+            }
             variant="cta" size="lg" fullWidth
             onPress={() => router.push('/paywall')}
             style={{ marginTop: theme.spacing[3] }}
@@ -138,7 +159,7 @@ export default function PlanDetails() {
         <Text style={styles.section}>{t('planDetails.supportTitle')}</Text>
         <Pressable
           style={styles.supportCard}
-          onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Okuma%20Dedektifi%20Destek`)}
+          onPress={() => Linking.openURL(supportMailto('Destek')).catch(() => {})}
         >
           <Ionicons name="mail-outline" size={22} color={theme.colors.brand.primary} />
           <View style={{ flex: 1 }}>
@@ -194,6 +215,17 @@ const styles = StyleSheet.create({
   expiryWarningText: {
     ...theme.typography.body,
     color: theme.colors.feedback.warningText,
+    flex: 1,
+  },
+  noAutoRenewCard: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing[2],
+    backgroundColor: theme.colors.feedback.successSubtle,
+    padding: theme.spacing[3], borderRadius: theme.radius.md,
+    marginBottom: theme.spacing[3],
+  },
+  noAutoRenewText: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.feedback.successText,
     flex: 1,
   },
 });

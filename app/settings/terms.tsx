@@ -20,10 +20,10 @@ export default function TermsScreen() {
 
         {/* ─── Terms of Service ─── */}
         <Text style={styles.section}>Kullanım Koşulları</Text>
-        <Text style={styles.updated}>Son güncelleme: [TARİH]</Text>
+        <Text style={styles.updated}>Son güncelleme: 25/5/2026</Text>
 
         <Text style={styles.body}>
-          Bu uygulama ("Fonolog") Villa Akademia tarafından sunulmaktadır.
+          Bu uygulama ("Fonolog") Fonolog tarafından sunulmaktadır.
           Uygulamayı kullanarak aşağıdaki koşulları kabul etmiş olursunuz.
         </Text>
 
@@ -56,59 +56,136 @@ export default function TermsScreen() {
         <View style={styles.divider} />
 
         {/* ─── Privacy Policy / KVKK ─── */}
-        <Text style={styles.section}>Gizlilik Politikası ve KVKK</Text>
-        <Text style={styles.updated}>Son güncelleme: [TARİH]</Text>
+        <Text style={styles.section}>Gizlilik Politikası ve KVKK Aydınlatma Metni</Text>
+        <Text style={styles.updated}>Son güncelleme: 25/5/2026</Text>
 
         <Text style={styles.body}>
-          6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında
-          kişisel verileriniz hakkında sizi bilgilendirmek isteriz.
+          6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında kişisel
+          verilerinizin nasıl toplandığı, işlendiği ve korunduğu hakkında sizi
+          bilgilendirmek isteriz.
         </Text>
 
-        <Text style={styles.h3}>Veri Sorumlusu</Text>
+        <Text style={styles.h3}>1. Veri Sorumlusu</Text>
         <Text style={styles.body}>
-          Villa Akademia — [ADRES] — [E-POSTA]
+          Fonolog — Bursa — fonologpro@gmail.com
         </Text>
 
-        <Text style={styles.h3}>Toplanan Veriler</Text>
+        <Text style={styles.h3}>2. Toplanan Kişisel Veriler</Text>
         <Text style={styles.body}>
-          • Ad ve e-posta adresi{'\n'}
-          • Çocuğun yaşı ve avatar tercihi{'\n'}
-          • Uygulama içi ilerleme ve oturum verileri{'\n'}
-          • Cihaz push bildirimi tokeni (bildirim için)
+          Kimlik ve İletişim:{'\n'}
+          {'  '}• Ad soyad, e-posta adresi, şifre (şifreli/hash olarak saklanır){'\n\n'}
+          Profil Verileri:{'\n'}
+          {'  '}• Kullanıcı rolü (öğrenci / öğretmen){'\n'}
+          {'  '}• Abonelik durumu ve bitiş tarihi{'\n'}
+          {'  '}• Çocuk yaşı ve avatar tercihi (öğrenci profillerinde){'\n'}
+          {'  '}• Okul adı, öğretmen yaşı, planlanan öğrenci sayısı (öğretmen profillerinde){'\n\n'}
+          Eğitim ve Öğrenme Verileri:{'\n'}
+          {'  '}• Kelime öğrenme ilerlemesi{'\n'}
+          {'  '}• Oyun oturumu kayıtları (süre, doğruluk oranı, XP puanı){'\n'}
+          {'  '}• Günlük/döngüsel tamamlanma, seri ve seviye verileri{'\n'}
+          {'  '}• Ödev kayıtları, skorlar ve öğretmen notları{'\n\n'}
+          Abonelik ve Ödeme Verileri:{'\n'}
+          {'  '}• Abonelik türü, başlangıç ve bitiş tarihi{'\n'}
+          {'  '}• Kart bilgisi uygulamada işlenmez; Google Play altyapısı tarafından yönetilir{'\n\n'}
+          Teknik Veriler:{'\n'}
+          {'  '}• Cihaz push bildirim tokeni, platform bilgisi (Android / iOS)
         </Text>
 
-        <Text style={styles.h3}>İşleme Amaçları</Text>
+        <Text style={styles.h3}>3. İşleme Amaçları ve Hukuki Dayanakları</Text>
         <Text style={styles.body}>
-          Verileriniz; hesap yönetimi, kişiselleştirilmiş içerik sunumu,
-          abonelik işlemleri ve yasal yükümlülüklerin yerine getirilmesi
-          amacıyla işlenmektedir.
+          • Hesap oluşturma ve kimlik doğrulama — Sözleşmenin ifası{'\n'}
+          • Yaşa ve role uygun içerik sunumu — Sözleşmenin ifası{'\n'}
+          • Öğrenme gelişiminin takibi ve raporlanması — Sözleşmenin ifası{'\n'}
+          • Abonelik ve ödeme yönetimi — Sözleşmenin ifası{'\n'}
+          • Push bildirim gönderimi — Sözleşmenin ifası{'\n'}
+          • Hizmet güvenliği ve kalitesinin iyileştirilmesi — Meşru menfaat
         </Text>
 
-        <Text style={styles.h3}>Veri Güvenliği</Text>
+        <Text style={styles.h3}>4. Kişisel Verilerin Aktarılması</Text>
         <Text style={styles.body}>
-          Verileriniz Supabase altyapısında şifreli olarak depolanmaktadır.
-          Üçüncü taraflarla satılmaz veya paylaşılmaz.
+          Verileriniz yalnızca hizmetin sunulması amacıyla ve gerekli minimum veriyle
+          sınırlı olmak üzere aşağıdaki hizmet sağlayıcılarla paylaşılmaktadır:{'\n\n'}
+          • Supabase Inc. (ABD) — Veritabanı ve kimlik doğrulama altyapısı{'\n'}
+          • RevenueCat Inc. (ABD) — Abonelik yönetimi{'\n'}
+          • Google LLC (ABD) — Google Play ödeme altyapısı{'\n'}
+          • Resend Inc. (ABD) — E-posta gönderimi{'\n'}
+          • Expo (ABD) — Push bildirim altyapısı{'\n\n'}
+          Bu aktarımlar KVKK'nın 9. maddesi kapsamında ilgili tarafların standart
+          sözleşme taahhütleri çerçevesinde gerçekleştirilmektedir. Verileriniz
+          yukarıda sayılanlar dışında hiçbir üçüncü tarafla satılmaz veya paylaşılmaz.
         </Text>
 
-        <Text style={styles.h3}>Haklarınız</Text>
+        <Text style={styles.h3}>5. Saklama Süreleri</Text>
         <Text style={styles.body}>
-          KVKK madde 11 kapsamında verilerinize erişim, düzeltme, silme ve
-          işlemenin sınırlandırılmasını talep etme hakkına sahipsiniz.
-          Talep için: [E-POSTA]
+          • Hesap ve profil verileri: Hesap aktif olduğu süre + 3 yıl{'\n'}
+          • Öğrenme ve ilerleme verileri: Hesap aktif olduğu süre{'\n'}
+          • Oturum kayıtları ve işlem logları: 2 yıl{'\n'}
+          • Abonelik ve ödeme kayıtları: 10 yıl (Vergi Usul Kanunu gereği){'\n'}
+          • E-posta iletişim kayıtları: 3 yıl{'\n\n'}
+          Süreler dolduğunda verileriniz güvenli biçimde silinmekte veya anonim
+          hâle getirilmektedir.
         </Text>
 
-        <Text style={styles.h3}>Çerezler ve Analitik</Text>
+        <Text style={styles.h3}>6. Çocukların Kişisel Verileri</Text>
         <Text style={styles.body}>
-          Uygulama, hizmet kalitesini iyileştirmek amacıyla anonim kullanım
-          istatistikleri toplayabilir.
+          Fonolog, ilkokul çağındaki çocuklar için tasarlanmış bir eğitim
+          uygulamasıdır. 13 yaş altı çocukların uygulamayı yalnızca ebeveyn/yasal
+          temsilci gözetimi ve onayıyla kullanması gerekmektedir.{'\n\n'}
+          Veli veya yasal temsilci olarak çocuğunuzun verilerinin düzeltilmesini
+          veya silinmesini fonologpro@gmail.com adresine başvurarak talep
+          edebilirsiniz. Uygulamamıza rıza olmaksızın kaydedilmiş bir çocuğun
+          verisini fark ederseniz lütfen aynı adrese bildirin; söz konusu veriler
+          en kısa sürede silinecektir.
+        </Text>
+
+        <Text style={styles.h3}>7. Güvenlik</Text>
+        <Text style={styles.body}>
+          • Tüm veriler TLS/SSL şifreli bağlantılar üzerinden iletilmektedir{'\n'}
+          • Şifreler hiçbir zaman açık metin olarak saklanmaz (bcrypt){'\n'}
+          • Row Level Security ile her kullanıcı yalnızca kendi verilerine erişebilir{'\n'}
+          • Kart bilgileri uygulamamızda saklanmaz; Google Play tarafından işlenir{'\n'}
+          • Push bildirim tokenleri yalnızca bildirim gönderimi amacıyla kullanılır
+        </Text>
+
+        <Text style={styles.h3}>8. E-posta İletişimi</Text>
+        <Text style={styles.body}>
+          Hizmetin sunulması kapsamında aşağıdaki işlemsel e-postalar gönderilebilir:{'\n'}
+          • Hoş geldiniz e-postası (kayıt tamamlandığında){'\n'}
+          • Şifre sıfırlama bağlantısı (talep üzerine){'\n'}
+          • Abonelik başlangıcı, yenileme ve sona erme bildirimleri{'\n'}
+          • Hesap silme onay bildirimi{'\n\n'}
+          Bu e-postalar hizmetin zorunlu bir parçasıdır; abonelikten çıkma seçeneği
+          bulunmamaktadır.
+        </Text>
+
+        <Text style={styles.h3}>9. Haklarınız (KVKK Madde 11)</Text>
+        <Text style={styles.body}>
+          KVKK'nın 11. maddesi kapsamında aşağıdaki haklara sahipsiniz:{'\n'}
+          • Kişisel verilerinizin işlenip işlenmediğini öğrenme{'\n'}
+          • İşlenen veriler hakkında bilgi talep etme{'\n'}
+          • Verilerin işlenme amacını öğrenme{'\n'}
+          • Aktarıldığı üçüncü kişileri bilme{'\n'}
+          • Eksik veya yanlış verilerin düzeltilmesini isteme{'\n'}
+          • Verilerin silinmesini veya yok edilmesini talep etme{'\n'}
+          • Otomatik işleme sonuçlarına itiraz etme{'\n'}
+          • Kanuna aykırı işleme nedeniyle zararın giderilmesini talep etme{'\n\n'}
+          Başvuru için fonologpro@gmail.com adresine "KVKK Başvurusu" konuluyla
+          e-posta gönderin. Talepler en geç 30 gün içinde yanıtlanır.
+        </Text>
+
+        <Text style={styles.h3}>10. Politika Değişiklikleri</Text>
+        <Text style={styles.body}>
+          Bu politika, mevzuat değişiklikleri veya uygulama güncellemeleri
+          nedeniyle zaman zaman güncellenebilir. Önemli değişiklikler uygulama
+          içi bildirim ve/veya e-posta ile duyurulacaktır.
         </Text>
 
         <View style={styles.divider} />
 
         <Text style={styles.footerNote}>
-          Bu metinler taslak niteliğinde olup yayın öncesinde hukuki danışmanınız
-          tarafından gözden geçirilmesi tavsiye edilir.
+          Her türlü soru ve başvuru için: fonologpro@gmail.com
         </Text>
+
       </ScrollView>
     </SafeAreaView>
   );

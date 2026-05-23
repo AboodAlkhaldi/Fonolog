@@ -22,9 +22,9 @@ export default function ForgotScreen() {
   const mutation = useMutation({
     mutationFn: async (values: ForgotValues) => {
       const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-        redirectTo: 'okuma://reset-password',
+        redirectTo: 'fonolog://reset-password',
       });
-      if (error) throw new AppError(translateAuthError(error), (error as any)?.code);
+      if (error) throw new AppError(translateAuthError(error, 'reset'), (error as any)?.code);
     },
     onError: alert.setAlert,
   });

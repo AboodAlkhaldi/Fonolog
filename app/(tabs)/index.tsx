@@ -6,52 +6,43 @@ import { Screen, Button, Badge } from '@/components';
 import { CharacterRenderer } from '@/components/character/CharacterRenderer';
 import { NotificationBell } from '@/components/common/NotificationBell';
 import { useAuth } from '@/store/auth';
-import { supabase } from '@/lib/supabase';
+import { useCharacter } from '@/store/character';
 import { getAccessTier, trialDaysRemaining } from '@/lib/access-tier';
 import {
   loadDayProgress,
   effectiveDay,
   getTodayGames,
   nextPendingGame,
+  todayDoneSet,
   type DayProgress,
 } from '@/lib/day-progress';
 import { withPreviewPlaceholders } from '@/lib/preview-profile';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
-interface CharStats {
-  total_xp: number;
-  level: number;
-  current_streak: number;
-  base_character_id: string | null;
-}
-
 export default function HomeTab() {
   const realProfile   = useAuth((s) => s.profile);
   const impersonating = useAuth((s) => s.impersonating);
   const profile       = withPreviewPlaceholders(realProfile, impersonating);
-  const [stats, setStats] = useState<CharStats | null>(null);
-  const [baseChar, setBaseChar] = useState<any>(null);
+
+  // Character lives in a shared store so equipping on the Karakter tab
+  // re-renders this page automatically (no logout/login required).
+  const loadCharacter   = useCharacter((s) => s.load);
+  const stats           = useCharacter((s) => s.stats);
+  const baseChar        = useCharacter((s) => s.equippedBase);
+  const variant         = useCharacter((s) => s.equippedVariant);
+
   const [dayProgress, setDayProgress] = useState<DayProgress | null>(null);
 
   useEffect(() => {
-    // Skip live character fetch when impersonating — the preview uses placeholder stats.
+    if (!realProfile || impersonating) return;
+    loadCharacter(realProfile.id);
+  }, [realProfile?.id, impersonating, loadCharacter]);
+
+  useEffect(() => {
     if (!realProfile || impersonating) return;
     let alive = true;
     (async () => {
-      const { data } = await supabase
-        .from('student_character')
-        .select('total_xp, level, current_streak, base_character_id')
-        .eq('student_id', realProfile.id)
-        .maybeSingle();
-      if (alive && data) {
-        setStats(data as any);
-        if (data.base_character_id) {
-          const { data: bc } = await supabase
-            .from('characters_base').select('*').eq('id', data.base_character_id).maybeSingle();
-          setBaseChar(bc);
-        }
-      }
       const progress = await loadDayProgress(realProfile.id);
       if (alive) setDayProgress(progress);
     })();
@@ -96,6 +87,7 @@ export default function HomeTab() {
       <View style={styles.greetingRow}>
         <CharacterRenderer
           base={baseChar ? { id: baseChar.id, asset_url: baseChar.asset_url, asset_type: baseChar.asset_type } : null}
+          variant={variant ? { id: variant.id, asset_url: variant.asset_url, asset_type: variant.asset_type } : null}
           size={64}
           fallbackEmoji={profile.child_avatar_emoji ?? '🦁'}
         />
@@ -176,7 +168,7 @@ function DayCard({
   const tier = getAccessTier(profile as any);
   const day = effectiveDay(tier, dayProgress);
   const todayGames = getTodayGames(profile as any, dayProgress);
-  const done = new Set(dayProgress.completion[String(day)] ?? []);
+  const done = todayDoneSet(dayProgress, tier);
   const doneCount = todayGames.filter((m) => done.has(m)).length;
   const total = todayGames.length;
   const allDone = total > 0 && doneCount === total;

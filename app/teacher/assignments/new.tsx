@@ -12,12 +12,15 @@ import { checkUsage, recordUsage } from '@/lib/entitlements';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
+const MIN_WORDS = 10;
+const MAX_WORDS = 20;
+
 export default function NewAssignment() {
   const teacher = useAuth((s) => s.user);
   const profile = useAuth((s) => s.profile);
   const impersonating = useAuth((s) => s.impersonating);
   const params = useLocalSearchParams<{ studentId?: string }>();
-  const [step, setStep] = useState<'student'|'words'|'modules'|'meta'>(
+  const [step, setStep] = useState<'student'|'words'|'module'|'meta'>(
     params.studentId ? 'words' : 'student',
   );
 
@@ -28,7 +31,8 @@ export default function NewAssignment() {
   const [pickedWords, setPickedWords] = useState<Set<string>>(new Set());
 
   const modules = listModules();
-  const [pickedModules, setPickedModules] = useState<Set<string>>(new Set());
+  /** Single-select — only one game per ödev. */
+  const [pickedModuleId, setPickedModuleId] = useState<string | null>(null);
 
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -58,18 +62,19 @@ export default function NewAssignment() {
     })();
   }, [teacher?.id]);
 
+  const wordCountOk = pickedWords.size >= MIN_WORDS && pickedWords.size <= MAX_WORDS;
+
   const submit = async () => {
     if (!teacher) return;
     if (impersonating === 'teacher') {
       showAlert(t('profile.previewAction'), t('teacher.assignment.previewMsg'));
       return;
     }
-    if (!studentId || pickedWords.size === 0 || pickedModules.size === 0 || !title) {
+    if (!studentId || !pickedModuleId || !wordCountOk || !title) {
       showAlert(t('teacher.assignment.incompleteTitle'), t('teacher.assignment.incompleteMsg'));
       return;
     }
 
-    // Quota check (trial: 2 ödev / hafta)
     const usage = await checkUsage(profile, 'assignment_create');
     if (!usage.allowed) {
       showAlert(
@@ -85,17 +90,17 @@ export default function NewAssignment() {
 
     setSubmitting(true);
 
-    const { data: assignment, error } = await supabase
-      .from('assignments')
+    const { data: homework, error } = await supabase
+      .from('homeworks')
       .insert({
         teacher_id:   teacher.id,
         student_id:   studentId,
+        module_id:    pickedModuleId,
+        word_ids:     Array.from(pickedWords),
         title,
         instructions: message || null,
-        module_ids:   Array.from(pickedModules),
-        word_ids:     Array.from(pickedWords),
         status:       'assigned',
-      })
+      } as any)
       .select()
       .single();
 
@@ -105,14 +110,35 @@ export default function NewAssignment() {
       return;
     }
 
-    // Notify the student in-app. Best-effort: do not fail the flow if this insert errors.
-    await supabase.from('notifications').insert({
+    // In-app notification for student. We insert directly here so the student
+    // sees the homework even if the push edge function fails. If THIS insert
+    // fails (RLS hiccup, network blip), we still call send-push below — the
+    // edge function dedups on payload.homework_id, so the student ends up with
+    // exactly one notification regardless of which path lands first.
+    const homeworkId = (homework as any)?.id;
+    const { error: notifErr } = await supabase.from('notifications').insert({
       user_id: studentId,
-      type:    'assignment_new',
+      type:    'homework_new',
       title:   t('teacher.assignment.notifTitle'),
       body:    title,
-      payload: { assignment_id: assignment?.id, teacher_id: teacher.id, message },
-    });
+      payload: { homework_id: homeworkId, teacher_id: teacher.id, message },
+    } as any);
+    if (notifErr) {
+      console.warn('[homework] student notification insert failed, falling back to send-push', notifErr.message);
+    }
+
+    // Push notification + inbox fallback. send-push checks for an existing
+    // notifications row with the same homework_id and skips its own insert if
+    // found, so the student never sees a duplicate.
+    supabase.functions.invoke('send-push', {
+      body: {
+        user_id: studentId,
+        title:   t('teacher.assignment.notifTitle'),
+        body:    title,
+        type:    'homework_new',
+        data:    { homework_id: homeworkId, teacher_id: teacher.id },
+      },
+    }).catch((e) => console.warn('[homework] send-push failed', e));
 
     await recordUsage(profile, 'assignment_create');
 
@@ -129,9 +155,8 @@ export default function NewAssignment() {
       </Pressable>
       <Text style={styles.title}>{t('teacher.assignment.title')}</Text>
 
-      {/* Step nav */}
       <View style={styles.steps}>
-        {(['student','words','modules','meta'] as const).map((s, i) => (
+        {(['student','words','module','meta'] as const).map((s, i) => (
           <Pressable key={s} onPress={() => setStep(s)} style={[styles.stepBtn, step === s && styles.stepBtnActive]}>
             <Text style={[styles.stepText, step === s && styles.stepTextActive]}>{i+1}</Text>
           </Pressable>
@@ -152,7 +177,7 @@ export default function NewAssignment() {
           renderItem={({ item }) => (
             <Pressable
               style={[styles.row, studentId === item.id && styles.rowSelected]}
-              onPress={() => { setStudentId(item.id); setPickedModules(new Set()); setStep('words'); }}
+              onPress={() => { setStudentId(item.id); setPickedModuleId(null); setStep('words'); }}
             >
               <Text style={{ fontSize: 24 }}>{item.child_avatar_emoji ?? '🦁'}</Text>
               <Text style={styles.rowText}>{item.full_name}</Text>
@@ -163,7 +188,11 @@ export default function NewAssignment() {
 
       {step === 'words' && (
         <View style={{ flex: 1 }}>
-          <Text style={styles.hint}>{t('teacher.assignment.wordsHint', { count: pickedWords.size })}</Text>
+          <Text style={styles.hint}>
+            {t('teacher.assignment.wordsHintRange', {
+              count: pickedWords.size, min: MIN_WORDS, max: MAX_WORDS,
+            })}
+          </Text>
           <FlatList
             style={{ flex: 1 }}
             data={allWords}
@@ -172,14 +201,16 @@ export default function NewAssignment() {
             contentContainerStyle={{ paddingBottom: theme.spacing[3] }}
             renderItem={({ item }) => {
               const selected = pickedWords.has(item.id);
+              const atMax = !selected && pickedWords.size >= MAX_WORDS;
               return (
                 <Pressable
                   onPress={() => {
+                    if (atMax) return;
                     const next = new Set(pickedWords);
                     selected ? next.delete(item.id) : next.add(item.id);
                     setPickedWords(next);
                   }}
-                  style={[styles.wordTile, selected && styles.wordTileSelected]}
+                  style={[styles.wordTile, selected && styles.wordTileSelected, atMax && styles.rowLocked]}
                 >
                   <Text>{item.emoji}</Text>
                   <Text style={styles.wordTileText}>{item.word}</Text>
@@ -187,27 +218,23 @@ export default function NewAssignment() {
               );
             }}
           />
-          <Button label={t('teacher.assignment.continueBtn')} variant="cta" size="md" onPress={() => setStep('modules')} disabled={pickedWords.size === 0} />
+          <Button label={t('teacher.assignment.continueBtn')} variant="cta" size="md" onPress={() => setStep('module')} disabled={!wordCountOk} />
         </View>
       )}
 
-      {step === 'modules' && (
+      {step === 'module' && (
         <View style={{ flex: 1 }}>
-          <Text style={styles.hint}>{t('teacher.assignment.modulesHint', { count: pickedModules.size })}</Text>
+          <Text style={styles.hint}>{t('teacher.assignment.moduleHintSingle')}</Text>
           <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={{ paddingBottom: theme.spacing[3] }}
           >
             {modules.map((m) => {
-              const selected = pickedModules.has(m.id);
+              const selected = pickedModuleId === m.id;
               return (
                 <Pressable
                   key={m.id}
-                  onPress={() => {
-                    const next = new Set(pickedModules);
-                    selected ? next.delete(m.id) : next.add(m.id);
-                    setPickedModules(next);
-                  }}
+                  onPress={() => setPickedModuleId(m.id)}
                   style={[styles.row, selected && styles.rowSelected]}
                 >
                   <Text style={{ fontSize: 24 }}>{m.icon}</Text>
@@ -219,7 +246,7 @@ export default function NewAssignment() {
               );
             })}
           </ScrollView>
-          <Button label={t('teacher.assignment.continueBtn')} variant="cta" size="md" onPress={() => setStep('meta')} disabled={pickedModules.size === 0} />
+          <Button label={t('teacher.assignment.continueBtn')} variant="cta" size="md" onPress={() => setStep('meta')} disabled={!pickedModuleId} />
         </View>
       )}
 
@@ -276,11 +303,9 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   rowSelected: { borderColor: theme.colors.brand.primary },
-  rowLocked:   { opacity: 0.55 },
+  rowLocked:   { opacity: 0.45 },
   rowText: { ...theme.typography.body, color: theme.colors.text.primary },
-  rowTextLocked: { color: theme.colors.text.muted },
   rowSubtext: { ...theme.typography.caption, color: theme.colors.text.muted, marginTop: 2 },
-  lockLabel:  { ...theme.typography.caption, color: theme.colors.feedback.errorText, marginTop: 2 },
   wordTile: {
     flex: 1, margin: 4, padding: 8,
     backgroundColor: theme.colors.background.secondary,

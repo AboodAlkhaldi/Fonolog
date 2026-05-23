@@ -12,6 +12,7 @@ import {
   loadDayProgress,
   effectiveDay,
   canPlayModule,
+  todayDoneSet,
   type DayProgress,
 } from '@/lib/day-progress';
 import { showAlert } from '@/store/alert';
@@ -49,7 +50,7 @@ export default function LearnTab() {
   }, [realProfile?.id, impersonating]);
 
   const currentDay = dayProgress ? effectiveDay(tier, dayProgress) : 1;
-  const doneSet    = new Set(dayProgress?.completion[String(currentDay)] ?? []);
+  const doneSet    = dayProgress ? todayDoneSet(dayProgress, tier) : new Set<string>();
 
   const alwaysOpenMods = ALWAYS_OPEN_MODULES
     .map((id) => getModule(id))
@@ -72,10 +73,27 @@ export default function LearnTab() {
     return true; // admin / subscribed / trial
   };
 
+  const showLocked = () => {
+    // Free users (and teachers in free preview) cannot unlock by finishing —
+    // they have to upgrade. Other tiers see the "finish today's games" copy.
+    if (tier === 'free') {
+      showAlert(
+        t('day.lockedProTitle'),
+        t('day.lockedProMsg'),
+        [
+          { text: t('app.cancel'), style: 'cancel' },
+          { text: t('day.upgradeBtn'), onPress: () => router.push('/paywall' as any) },
+        ],
+      );
+    } else {
+      showAlert(t('day.lockedTitle'), t('day.locked'), [{ text: t('app.ok'), style: 'cancel' }]);
+    }
+  };
+
   const launch = (m: ModuleDefinition) => {
     if (impersonating) {
       if (!isPlayableInPreview(m)) {
-        showAlert(t('day.lockedTitle'), t('day.locked'), [{ text: t('app.ok'), style: 'cancel' }]);
+        showLocked();
         return;
       }
       router.push(`/session/${m.id}` as any);
@@ -87,7 +105,7 @@ export default function LearnTab() {
     }
     if (!dayProgress) return;
     if (!canPlayModule(realProfile as any, dayProgress, m.id)) {
-      showAlert(t('day.lockedTitle'), t('day.locked'), [{ text: t('app.ok'), style: 'cancel' }]);
+      showLocked();
       return;
     }
     router.push(`/session/${m.id}` as any);

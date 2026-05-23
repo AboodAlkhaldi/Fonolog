@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl, Linking } from 'react-native';
+import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -10,26 +10,37 @@ import { t } from '@/i18n';
 import type { NotificationRow } from '@/lib/database.types';
 
 const TYPE_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
-  assignment_new:        'clipboard',
-  assignment_completed:  'checkmark-done',
-  assignment_due_soon:   'alarm',
-  milestone_due:         'flag',
-  milestone_completed:   'trophy',
-  streak_reminder:       'flame',
-  xp_milestone:          'star',
-  subscription_expiring: 'warning',
-  subscription_expired:  'lock-closed',
-  teacher_note:          'document-text',
-  teacher_message:       'chatbubble',
+  homework_new:              'clipboard',
+  homework_completed:        'checkmark-done',
+  homework_overdue:          'alarm',
+  homework_due_soon:         'alarm',
+  milestone_due:             'flag',
+  milestone_completed:       'trophy',
+  streak_reminder:           'flame',
+  xp_milestone:              'star',
+  subscription_started:      'rocket',
+  subscription_renewed:      'refresh',
+  subscription_expiring:     'warning',
+  subscription_expired:      'lock-closed',
+  subscription_cancelled:    'close-circle',
+  new_user_signup:           'person-add',
+  admin_subscription_event:  'card',
+  admin_account_removed:     'trash',
+  teacher_note:              'document-text',
+  teacher_message:           'chatbubble',
 };
 
 const TYPE_COLOR: Record<string, string> = {
-  assignment_new:        theme.colors.brand.primary,
-  assignment_completed:  theme.colors.feedback.success,
-  streak_reminder:       theme.colors.feedback.warningText,
-  subscription_expiring: theme.colors.feedback.warningText,
-  subscription_expired:  theme.colors.feedback.errorText,
-  teacher_message:       theme.colors.brand.secondaryHover,
+  homework_new:              theme.colors.brand.primary,
+  homework_completed:        theme.colors.feedback.success,
+  homework_overdue:          theme.colors.feedback.errorText,
+  streak_reminder:           theme.colors.feedback.warningText,
+  subscription_started:      theme.colors.feedback.success,
+  subscription_expiring:     theme.colors.feedback.warningText,
+  subscription_expired:      theme.colors.feedback.errorText,
+  subscription_cancelled:    theme.colors.feedback.errorText,
+  admin_account_removed:     theme.colors.feedback.errorText,
+  teacher_message:           theme.colors.brand.secondaryHover,
 };
 
 function formatTime(iso: string): string {
@@ -46,19 +57,13 @@ function formatTime(iso: string): string {
 }
 
 export default function NotificationsScreen() {
-  const { notifications, loading, reload, markRead, markAllRead, unreadCount } = useNotifications();
+  const { notifications, loading, reload, markAllRead, unreadCount } = useNotifications();
 
-  const handlePress = async (n: NotificationRow) => {
-    if (!n.read_at) await markRead(n.id);
-    const payload = (n.payload as any) ?? {};
-    if (n.type === 'assignment_new' && payload.assignment_id) {
-      router.push(`/learn/assignment/${payload.assignment_id}`);
-      return;
-    }
-    if (payload.report_url) {
-      Linking.openURL(payload.report_url).catch(() => {});
-      return;
-    }
+  const handlePress = (n: NotificationRow) => {
+    // Tapping a row opens the detail subpage. Mark-as-read happens there
+    // (and only when the user explicitly opens the notification), so the
+    // list stays accurate for users who only glance at the inbox.
+    router.push(`/notifications/${n.id}` as any);
   };
 
   if (loading) return <Screen><Loading /></Screen>;

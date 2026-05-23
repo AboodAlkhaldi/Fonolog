@@ -8,6 +8,7 @@ import { getOfferings, purchasePackage, restorePurchases } from '@/lib/purchases
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/store/alert';
 import { getAccessTier } from '@/lib/access-tier';
+import { SUPPORT_EMAIL, supportMailto } from '@/lib/contact';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
@@ -44,7 +45,7 @@ export default function PaywallScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const pkgs = await getOfferings();
+        const pkgs = await getOfferings(profile?.role === 'teacher' ? 'teacher' : 'student');
         if (pkgs.length === 0) {
           setUnavailable(true);
         } else {
@@ -117,23 +118,29 @@ export default function PaywallScreen() {
             <Text style={styles.unavailableTitle}>{t('paywall.unavailableTitle')}</Text>
             <Text style={styles.unavailableDesc}>{t('paywall.unavailableDesc')}</Text>
             <Pressable
-              onPress={() => Linking.openURL('mailto:info@villaakademia.com?subject=Okuma%20Dedektifi%20Abonelik')}
+              onPress={() => Linking.openURL(supportMailto('Abonelik')).catch(() => {})}
               style={styles.contactBtn}
             >
               <Ionicons name="mail-outline" size={18} color={theme.colors.text.primary} />
-              <Text style={styles.contactText}>info@villaakademia.com</Text>
+              <Text style={styles.contactText}>{SUPPORT_EMAIL}</Text>
             </Pressable>
           </View>
         ) : (
-          packages.map((pkg) => (
-            <Pressable key={pkg.identifier} style={styles.pkg} onPress={() => onBuy(pkg)}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.pkgTitle}>{pkg.product.title}</Text>
-                <Text style={styles.pkgDesc}>{pkg.product.description}</Text>
-              </View>
-              <Text style={styles.pkgPrice}>{pkg.product.priceString}</Text>
-            </Pressable>
-          ))
+          <>
+            {packages.map((pkg) => (
+              <Pressable key={pkg.identifier} style={styles.pkg} onPress={() => onBuy(pkg)}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pkgTitle}>{pkg.product.title}</Text>
+                  <Text style={styles.pkgDesc}>{pkg.product.description}</Text>
+                </View>
+                <Text style={styles.pkgPrice}>{pkg.product.priceString}</Text>
+              </Pressable>
+            ))}
+            <View style={styles.noAutoRenewCard}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={theme.colors.feedback.successText} />
+              <Text style={styles.noAutoRenewText}>{t('paywall.noAutoRenewNote')}</Text>
+            </View>
+          </>
         )}
 
         {!unavailable && (
@@ -189,5 +196,14 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing[3],
   },
   contactText: { ...theme.typography.bodyMedium, color: theme.colors.text.primary },
+  noAutoRenewCard: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing[2],
+    backgroundColor: theme.colors.feedback.successSubtle,
+    padding: theme.spacing[3], borderRadius: theme.radius.md,
+    marginTop: theme.spacing[2],
+  },
+  noAutoRenewText: {
+    ...theme.typography.bodySmall, color: theme.colors.feedback.successText, flex: 1,
+  },
   legal: { ...theme.typography.caption, color: theme.colors.text.muted, textAlign: 'center', marginTop: theme.spacing[4], paddingHorizontal: theme.spacing[3] },
 });
