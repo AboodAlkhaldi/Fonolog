@@ -7,7 +7,7 @@ import { useOnboarding } from '@/store/onboarding';
 import { theme }         from '@/theme';
 import { t }             from '@/i18n';
 
-const AGES = Array.from({ length: 16 }, (_, i) => i + 3);  // 3..18
+const AGES = Array.from({ length: 9 }, (_, i) => i + 5);  // 5..13
 
 export default function ChildAgeScreen() {
   const age    = useOnboarding((s) => s.age);
