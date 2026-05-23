@@ -21,6 +21,9 @@ import { translateAuthError } from '@/lib/auth-errors';
 import { setupDeepLinks } from '@/lib/deep-linking';
 import { offlineCache } from '@/lib/offline-cache';
 import { flushQueue } from '@/lib/offline-queue';
+import { showAlert } from '@/store/alert';
+import { useCharacter } from '@/store/character';
+import { useNotificationsStore } from '@/store/notifications';
 import type { ProfileRow } from '@/lib/database.types';
 
 export type AuthStatus =
@@ -69,6 +72,26 @@ interface AuthState {
   /** Admin preview controls. */
   startImpersonation:   (kind: 'student' | 'teacher') => void;
   stopImpersonation:    () => void;
+}
+
+/** Detect a paid → free transition (or the reverse) and surface a UI popup. */
+function diffPlanAndAlert(prev: Profile | null, next: Profile | null): void {
+  if (!prev || !next) return;
+  if (prev.id !== next.id) return; // different user — ignore
+  const wasPro  = (prev.subscription_status ?? 'free') !== 'free';
+  const isPro   = (next.subscription_status ?? 'free') !== 'free';
+  if (wasPro === isPro) return;
+  if (isPro) {
+    showAlert(
+      'Pro üyeliğin başladı! 🎉',
+      'Tüm içeriklere ve oyunlara erişim açıldı. İyi okumalar!',
+    );
+  } else {
+    showAlert(
+      'Aboneliğin sona erdi',
+      'Artık ücretsiz planı kullanıyorsun. Bazı oyunlar kilitli olacak — istediğin zaman Pro\'ya yeniden geçebilirsin.',
+    );
+  }
 }
 
 function deriveStatus(session: Session | null, profile: Profile | null): AuthStatus {
@@ -131,7 +154,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ status: 'unauthenticated', session: null, user: null, profile: null });
     }
 
-    // Deep-link recovery: parse okuma://reset-password#access_token=... and
+    // Deep-link recovery: parse fonolog://reset-password#access_token=... and
     // install the session. After that, flip status so the protected route
     // navigates to /reset-password. This is needed because on native we run
     // with detectSessionInUrl: false, so Supabase does not auto-handle the URL.
@@ -163,13 +186,28 @@ export const useAuth = create<AuthState>((set, get) => ({
         }
 
         // If a deactivated account just confirmed their email (re-registration),
-        // reactivate it so they continue from where they left off.
+        // reactivate it so they continue from where they left off. Also fire
+        // the welcome-back email (separate template from first-time welcome).
         if (event === 'SIGNED_IN' && p && (p as any).is_active === false) {
           await supabase
             .from('profiles')
             .update({ is_active: true } as any)
             .eq('id', newSession!.user.id);
           p = { ...p, is_active: true } as any;
+          supabase.functions.invoke('send-welcome-back-email', {
+            body: { user_id: newSession!.user.id },
+          }).catch((e) => console.warn('[auth] welcome-back email failed', e));
+        } else if (
+          event === 'SIGNED_IN' &&
+          p &&
+          newSession?.user?.email_confirmed_at &&
+          !(p as any).welcome_email_sent_at
+        ) {
+          // First-time verification: fire welcome email (idempotent on the
+          // server side via welcome_email_sent_at stamp).
+          supabase.functions.invoke('send-welcome-email', {
+            body: { user_id: newSession.user.id },
+          }).catch((e) => console.warn('[auth] welcome email failed', e));
         }
 
         // If a recovery deep-link already flipped us to needsPasswordReset,
@@ -182,6 +220,7 @@ export const useAuth = create<AuthState>((set, get) => ({
           return;
         }
 
+        diffPlanAndAlert(get().profile, p);
         const derived = deriveStatus(newSession, p);
         set({
           session: newSession,
@@ -201,10 +240,10 @@ export const useAuth = create<AuthState>((set, get) => ({
       password,
       options: {
         data: { full_name: fullName },
-        emailRedirectTo: 'okuma://verified',
+        emailRedirectTo: 'fonolog://verified',
       },
     });
-    if (error) throw new AppError(translateAuthError(error), (error as any)?.code);
+    if (error) throw new AppError(translateAuthError(error, 'register'), (error as any)?.code);
 
     // Supabase returns success with empty identities when the email is already
     // registered AND confirmed (security by obfuscation). Surface a real error.
@@ -212,8 +251,12 @@ export const useAuth = create<AuthState>((set, get) => ({
       throw new AppError('Bu e-posta adresi zaten kullanılıyor.');
     }
 
-    if (data.session) {
-      set({ session: data.session, user: data.user, status: 'awaitingEmailVerify' });
+    // With email confirmation enabled Supabase returns data.user but data.session
+    // is null — the session only arrives after the user clicks the email link.
+    // Store the user now so verify-email can show the address and
+    // useProtectedRoute stays on awaitingEmailVerify instead of bouncing back.
+    if (data.user) {
+      set({ session: data.session ?? null, user: data.user, status: 'awaitingEmailVerify' });
     }
   },
 
@@ -262,6 +305,15 @@ export const useAuth = create<AuthState>((set, get) => ({
     if (!user) throw new AppError('Oturum bulunamadı.');
     const { error } = await supabase.rpc('deactivate_account' as any);
     if (error) throw new AppError(error.message);
+    // Fire the goodbye email + admin emails. We do this BEFORE signOut so the
+    // user's session is still attached when the edge function authenticates.
+    try {
+      await supabase.functions.invoke('send-account-removed-email', {
+        body: { user_id: user.id },
+      });
+    } catch (e) {
+      console.warn('[auth] goodbye email failed', e);
+    }
     await supabase.auth.signOut();
     set({ status: 'unauthenticated', session: null, user: null, profile: null, impersonating: null });
   },
@@ -277,6 +329,8 @@ export const useAuth = create<AuthState>((set, get) => ({
       profile: null,
       impersonating: null,
     });
+    useCharacter.getState().clear();
+    useNotificationsStore.getState().clear();
     await supabase.auth.signOut();
   },
 
@@ -288,11 +342,12 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   refreshProfile: async () => {
-    const { user, session } = get();
+    const { user, session, profile: prevProfile } = get();
     if (!user) return;
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
     const profile = data as Profile;
     if (profile) offlineCache.setProfile(profile);
+    diffPlanAndAlert(prevProfile, profile);
     set({ profile, status: deriveStatus(session, profile) });
   },
 
@@ -307,8 +362,8 @@ export const useAuth = create<AuthState>((set, get) => ({
       .select()
       .single();
 
-    // DB trigger blocks role changes after first set. If the profile already has
-    // a role but is missing role_locked_at (pre-migration users), stamp the
+    // DB trigger blocks role changes after first set. If the profile already
+    // has a role but is missing role_locked_at (legacy data), stamp the
     // timestamp without touching role so deriveStatus can advance.
     if (error) {
       const isRoleLocked = error.message?.toLowerCase().includes('role cannot be modified');

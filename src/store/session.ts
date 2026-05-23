@@ -21,6 +21,7 @@ import {
   markModuleComplete,
   DAY_COMPLETION_MIN_ACCURACY,
 } from '@/lib/day-progress';
+import { ALWAYS_OPEN_MODULES, getDayForModule } from '@/domain/day-curriculum';
 import { isOnline } from '@/lib/online-status';
 import { enqueue as enqueueOfflineWrite } from '@/lib/offline-queue';
 import { useAuth } from './auth';
@@ -129,15 +130,35 @@ export const useSession = create<SessionState>((set, get) => ({
       const profile = useAuth.getState().profile;
       const tier    = getAccessTier(profile);
 
-      // Teacher-assigned homework bypasses day-based gating — the teacher
-      // explicitly granted access, and the assignment screen handles its own
-      // word/module scoping. For any other launch path we run the day-aware
-      // access check.
-      if (!opts.assignmentId) {
-        const dayProgress = profile ? await loadDayProgress(profile.id) : null;
-        if (!dayProgress || !canPlayModule(profile, dayProgress, moduleId)) {
-          set({ status: 'locked', errorMessage: 'Önce bugünün oyunlarını bitir.' });
-          return;
+      // Gating rules:
+      //   - homework launches: always allowed (teacher granted access)
+      //   - admin role: always allowed
+      //   - impersonation preview: gate by the REAL profile's tier:
+      //       free → Day 1 + always-open only (matches free student)
+      //       pro/trial → full access
+      //     Without this, a teacher who downgrades to free can still launch
+      //     locked games from the student preview.
+      //   - normal student: full day-progress check
+      const impersonating = useAuth.getState().impersonating;
+      const isAdmin = profile?.role === 'admin';
+
+      if (!opts.assignmentId && !isAdmin) {
+        if (impersonating) {
+          // Preview path: gate by the previewing user's own tier.
+          const isAlwaysOpen = ALWAYS_OPEN_MODULES.includes(moduleId);
+          if (!isAlwaysOpen && tier === 'free') {
+            const day = getDayForModule(moduleId);
+            if (day !== 1) {
+              set({ status: 'locked', errorMessage: 'Pro üyelik gerekli — bu oyun ücretsiz planda kilitli.' });
+              return;
+            }
+          }
+        } else {
+          const dayProgress = profile ? await loadDayProgress(profile.id) : null;
+          if (!dayProgress || !canPlayModule(profile, dayProgress, moduleId)) {
+            set({ status: 'locked', errorMessage: 'Önce bugünün oyunlarını bitir.' });
+            return;
+          }
         }
       }
 
@@ -315,37 +336,36 @@ export const useSession = create<SessionState>((set, get) => ({
     }
 
     if (extra.assignmentId) {
-      const { data: updated } = await supabase.from('assignments').update({
-        status: 'completed',
+      const scorePct = total > 0 ? Math.round((correctCnt / total) * 100) : 0;
+      const { data: updated } = await supabase.from('homeworks').update({
+        status:       'completed',
         completed_at: new Date().toISOString(),
-        session_id: sessionId,
-      }).eq('id', extra.assignmentId).select('teacher_id, title').maybeSingle();
+        session_id:   sessionId,
+        score:        scorePct,
+      } as any).eq('id', extra.assignmentId).select('teacher_id, title').maybeSingle();
 
-      // Notify teacher that the student completed the homework (in-app + push).
       if (updated?.teacher_id) {
         const notifBody = `${profile.full_name ?? 'Öğrenci'} "${updated.title}" ödevini bitirdi (${correctCnt}/${total} doğru).`;
-        // In-app notification (RLS allows student → linked teacher)
         await supabase.from('notifications').insert({
           user_id: updated.teacher_id,
-          type:    'assignment_completed',
+          type:    'homework_completed',
           title:   'Ödev Tamamlandı',
           body:    notifBody,
           payload: {
-            assignment_id: extra.assignmentId,
-            student_id:    profile.id,
-            session_id:    sessionId,
-            correct:       correctCnt,
+            homework_id: extra.assignmentId,
+            student_id:  profile.id,
+            session_id:  sessionId,
+            correct:     correctCnt,
             total,
           },
-        });
-        // Push notification — fire-and-forget; failure is non-blocking
+        } as any);
         supabase.functions.invoke('send-push', {
           body: {
             user_id: updated.teacher_id,
             title:   'Ödev Tamamlandı',
             body:    notifBody,
-            type:    'assignment_completed',
-            data:    { assignment_id: extra.assignmentId, student_id: profile.id },
+            type:    'homework_completed',
+            data:    { homework_id: extra.assignmentId, student_id: profile.id },
           },
         }).catch((e) => console.warn('[session] send-push failed', e));
       }
