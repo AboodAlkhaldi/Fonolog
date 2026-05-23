@@ -5,9 +5,8 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "okuma",
+    "scheme": "fonolog",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
@@ -28,12 +27,6 @@
         "backgroundColor": "#FFF8E7"
       },
       "permissions": [
-        "RECORD_AUDIO",
-        "VIBRATE",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "RECORD_AUDIO",
         "VIBRATE",
         "android.permission.RECORD_AUDIO",
@@ -66,7 +59,11 @@
           "image": "./assets/images/splash.png",
           "imageWidth": 200
         }
-      ]
+      ],
+      "expo-image",
+      "expo-sharing",
+      "expo-sqlite",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
@@ -76,13 +73,11 @@
         "origin": false
       },
       "eas": {
-        "projectId": "ad191aaa-7dc9-4f4d-8543-4bbbc3ea6e26"
+        "projectId": "335a0adc-d319-4221-bc5e-c27ed6e5d935"
       }
     },
     "owner": "aboodalkhaldis-organization",
-    "runtimeVersion": "1.0.0" ,
-    "updates": {
-      "url": "https://u.expo.dev/ad191aaa-7dc9-4f4d-8543-4bbbc3ea6e26"
-    }
+    "runtimeVersion": "1.0.0",
+    "updates": { "url": "https://u.expo.dev/335a0adc-d319-4221-bc5e-c27ed6e5d935" }
   }
 }

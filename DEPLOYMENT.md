@@ -48,6 +48,9 @@ supabase functions deploy reconcile-subscriptions
 supabase functions deploy revenuecat-webhook
 supabase functions deploy validate-subscription
 supabase functions deploy admin-signup-notify
+supabase functions deploy send-welcome-email
+supabase functions deploy send-welcome-back-email
+supabase functions deploy send-account-removed-email
 ```
 
 ### 1.4 Edge function secrets
@@ -56,7 +59,8 @@ Dashboard → Project Settings → Edge Functions → Secrets. Add:
 | Name | Value |
 |------|-------|
 | `RESEND_API_KEY` | From Resend dashboard (used for transactional emails) |
-22222222| `REVENUECAT_WEBHOOK_SECRET` | A long random string you generate (e.g. `openssl rand -base64 32`). You'll also paste this into RevenueCat in step 3. |
+| `REVENUECAT_WEBHOOK_SECRET` | A long random string you generate (e.g. `openssl rand -base64 32`). You'll also paste this into RevenueCat in step 3. |
+| `REVENUECAT_SECRET_KEY` | RevenueCat → Project Settings → API keys → **Secret API keys** (starts with `sk_`). Used by `validate-subscription` to fetch live subscriber state. **Not the public SDK key.** |
 | `CRON_SECRET` | A long random string (e.g. `openssl rand -base64 32`). Used by pg_cron jobs and the admin-signup trigger. |
 
 ### 1.5 Schedule pg_cron jobs
@@ -106,10 +110,15 @@ SELECT cron.schedule(
 ```
 
 ### 1.6 Auth — Redirect URL whitelist
-Dashboard → Authentication → URL Configuration → **Redirect URLs**, add:
-- `okuma://**`
+Dashboard → Authentication → URL Configuration:
 
-Without this, Supabase strips `okuma://reset-password` and `okuma://verified` from emails.
+**Site URL** (single value, **wildcards are NOT allowed** — the field rejects them silently and breaks signup/reset emails if you try):
+- `fonolog://`
+
+**Redirect URLs** (this is where wildcards belong):
+- `fonolog://**`
+
+Without the redirect URL entry, Supabase strips `fonolog://reset-password` and `fonolog://verified` from emails. Setting the Site URL to `fonolog://**` instead of `fonolog://` is a common mistake — it makes Supabase generate malformed redirect URLs and you'll see 422/500 errors during signup and password reset.
 
 ### 1.7 Auth — Email templates (optional but recommended)
 Dashboard → Authentication → Email Templates. Update sender name to `Fonolog` and customize the verify / reset / magic-link templates. The "Confirm your email" button needs to point at `{{ .ConfirmationURL }}` — Supabase fills the redirect target in automatically once the URL whitelist is configured.
@@ -134,10 +143,10 @@ Create these 4 products **exactly**:
 
 | Product ID | Description | Billing period |
 |-----------|-------------|----------------|
-| `okuma_student_monthly` | Öğrenci Pro — Aylık | 1 month |
-| `okuma_student_yearly`  | Öğrenci Pro — Yıllık | 1 year |
-| `okuma_expert_monthly`  | Uzman Pro — Aylık | 1 month |
-| `okuma_expert_yearly`   | Uzman Pro — Yıllık | 1 year |
+| `fonolog_student_monthly` | Öğrenci Pro — Aylık | 1 month |
+| `fonolog_student_yearly`  | Öğrenci Pro — Yıllık | 1 year |
+| `fonolog_teacher_monthly` | Uzman Pro — Aylık | 1 month |
+| `fonolog_teacher_yearly`  | Uzman Pro — Yıllık | 1 year |
 
 Set prices per country (TRY for Turkey). Activate each. They will be in **Draft** until your first build is uploaded to a track; that's expected.
 
@@ -166,8 +175,8 @@ You need this so RevenueCat (and `eas submit`) can interact with Play on your be
 ASC → Features → Subscriptions → Create subscription group "Fonolog Pro".
 
 Create the same 4 products as Android with the **exact** product IDs:
-- `okuma_student_monthly`, `okuma_student_yearly`
-- `okuma_expert_monthly`, `okuma_expert_yearly`
+- `fonolog_student_monthly`, `fonolog_student_yearly`
+- `fonolog_teacher_monthly`, `fonolog_teacher_yearly`
 
 Set localized names, descriptions, and pricing.
 
@@ -192,23 +201,23 @@ ASC → Apps → Fonolog → App Information → App-Specific Shared Secret → 
 
 ### 4.2 Entitlements
 Project → Entitlements → +, create two:
-- `okuma_student`
-- `okuma_expert`
+- `fonolog_student`
+- `fonolog_teacher`
 
 ### 4.3 Products
 Project → Products → +, add all 4 product IDs. For each product, attach to the right entitlement:
 
 | Product | Entitlement |
 |---------|-------------|
-| `okuma_student_monthly` | `okuma_student` |
-| `okuma_student_yearly`  | `okuma_student` |
-| `okuma_expert_monthly`  | `okuma_expert` |
-| `okuma_expert_yearly`   | `okuma_expert` |
+| `fonolog_student_monthly` | `fonolog_student` |
+| `fonolog_student_yearly`  | `fonolog_student` |
+| `fonolog_teacher_monthly` | `fonolog_teacher` |
+| `fonolog_teacher_yearly`  | `fonolog_teacher` |
 
 ### 4.4 Offering
 Project → Offerings → +
 - Identifier: `default`
-- Add 4 packages: `okuma_student_monthly`, `okuma_student_yearly`, `okuma_expert_monthly`, `okuma_expert_yearly` (one each)
+- Add 4 packages: `fonolog_student_monthly`, `fonolog_student_yearly`, `fonolog_teacher_monthly`, `fonolog_teacher_yearly` (one each)
 - Mark this offering as **Current**
 
 ### 4.5 API keys → app env
@@ -243,10 +252,10 @@ eas init
 ### 5.3 Set EAS secrets
 These get injected into the build at compile time:
 ```bash
-eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_URL          --value "https://<PROJECT_REF>.supabase.co"
-eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY     --value "<YOUR_ANON_KEY>"
-eas secret:create --scope project --name EXPO_PUBLIC_REVENUECAT_IOS        --value "<RC_IOS_KEY>"
-eas secret:create --scope project --name EXPO_PUBLIC_REVENUECAT_ANDROID    --value "<RC_ANDROID_KEY>"
+eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_URL --value "https://<PROJECT_REF>.supabase.co"
+eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "<YOUR_ANON_KEY>"
+eas secret:create --scope project --name EXPO_PUBLIC_REVENUECAT_IOS --value "<RC_IOS_KEY>"
+eas secret:create --scope project --name EXPO_PUBLIC_REVENUECAT_ANDROID --value "<RC_ANDROID_KEY>"
 
 # Only needed for `eas submit`:
 eas secret:create --scope project --name APPLE_ID     --value "your-apple-id@example.com"
