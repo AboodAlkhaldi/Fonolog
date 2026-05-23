@@ -1,14 +1,20 @@
 /**
- * RevenueCat integration.
+ * RevenueCat integration — no-auto-renewal model.
  *
- * Setup (RevenueCat dashboard):
- *   - Offering "default" containing packages:
- *       okuma_student_monthly  (₺79 TRY / month)
- *       okuma_student_yearly   (₺799 TRY / year)
- *       okuma_expert_monthly   (₺399 TRY / month)
- *       okuma_expert_yearly    (₺3399 TRY / year)
- *   - Entitlements: `okuma_student`, `okuma_expert`
- *   - Set EXPO_PUBLIC_REVENUECAT_IOS / ANDROID env vars
+ * Products are CONSUMABLE in-app products in Play Console (not subscriptions).
+ * Each purchase grants a fixed window of Pro (30 or 365 days). We never
+ * initiate a renewal; when the window ends, the user is downgraded by the
+ * `expire-subscriptions` cron and must repurchase to extend.
+ *
+ * RevenueCat dashboard:
+ *   - Entitlements: `fonolog_student`, `fonolog_teacher`
+ *   - Offering "default" containing packages for each role/period.
+ *   - Webhook → /functions/v1/revenuecat-webhook (see that file's header).
+ *   - Set EXPO_PUBLIC_REVENUECAT_IOS / ANDROID env vars.
+ *
+ * Source of truth for status/expiry: `profiles` table, written exclusively
+ * by the revenuecat-webhook. The client just triggers the purchase, waits
+ * briefly for the webhook to land, then refreshes the local profile.
  */
 import Purchases, { LOG_LEVEL, type CustomerInfo, type PurchasesPackage } from 'react-native-purchases';
 import { Platform } from 'react-native';
@@ -16,6 +22,16 @@ import { supabase } from './supabase';
 import { useAuth } from '@/store/auth';
 
 let initialized = false;
+
+/**
+ * RC's web SDK (used by Expo Go in browser mode) throws "not supported on web"
+ * for `invalidateCustomerInfoCache`. We still want to call it on iOS / Android
+ * so the next `getCustomerInfo` returns fresh entitlements; on web we skip.
+ */
+async function safeInvalidateCustomerInfoCache(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try { await Purchases.invalidateCustomerInfoCache(); } catch { /* ignore */ }
+}
 
 export async function initPurchases(userId: string): Promise<void> {
   if (initialized) {
@@ -35,21 +51,15 @@ export async function initPurchases(userId: string): Promise<void> {
 }
 
 /**
- * App-launch bootstrap: configure RevenueCat ONLY.
+ * App-launch bootstrap: configure RevenueCat and re-pull the profile.
  *
  * DB is the source of truth: `profiles.subscription_status` and
- * `subscription_expires` are written by the revenuecat-webhook on the actual
- * purchase event, by the `reconcile-subscriptions` cron once a day for missed
- * webhooks, and by the `expire-subscriptions` cron when an active plan lapses.
- *
- * We intentionally do NOT call validate-subscription on every login: that path
- * previously caused observable "re-charge / duplicate entitlement" symptoms.
- * If a user explicitly taps "restore purchases" we still sync (see restorePurchases).
+ * `subscription_expires` are written exclusively by the revenuecat-webhook on
+ * a successful purchase, and by the `expire-subscriptions` cron when a plan
+ * lapses. We do NOT call out to RC here — the webhook already populated DB.
  */
 export async function bootstrapPurchases(userId: string): Promise<void> {
   await initPurchases(userId);
-  // Refresh the profile from DB so the local store reflects the server state
-  // (webhook may have updated subscription_status while the app was closed).
   try {
     await useAuth.getState().refreshProfile();
   } catch (e) {
@@ -57,55 +67,51 @@ export async function bootstrapPurchases(userId: string): Promise<void> {
   }
 }
 
-export async function getOfferings(): Promise<PurchasesPackage[]> {
+export async function getOfferings(role?: 'student' | 'teacher'): Promise<PurchasesPackage[]> {
   const offerings = await Purchases.getOfferings();
+  if (role && offerings.all[role]) return offerings.all[role].availablePackages;
   return offerings.current?.availablePackages ?? [];
+}
+
+/**
+ * Wait for the webhook to land in DB after a purchase, then refresh local
+ * profile. Polls `profiles.subscription_expires` for up to ~6 seconds — the
+ * webhook usually hits DB within ~1 second, but we give it slack for slow
+ * networks / cold edge-function starts.
+ */
+async function waitForWebhookAndRefresh(): Promise<void> {
+  const userId = useAuth.getState().user?.id;
+  if (!userId) return;
+  const before = useAuth.getState().profile?.subscription_expires ?? null;
+  for (let i = 0; i < 6; i++) {
+    await new Promise(r => setTimeout(r, 1000));
+    const { data } = await supabase
+      .from('profiles')
+      .select('subscription_expires')
+      .eq('id', userId)
+      .maybeSingle();
+    const next = (data as any)?.subscription_expires ?? null;
+    // Webhook landed if the row now has a later (or first-ever) expiry.
+    if (next && next !== before) break;
+  }
+  try {
+    await useAuth.getState().refreshProfile();
+  } catch (e) {
+    console.warn('[purchases] profile refresh failed', e);
+  }
 }
 
 export async function purchasePackage(pkg: PurchasesPackage): Promise<CustomerInfo> {
   const { customerInfo } = await Purchases.purchasePackage(pkg);
-  await syncSubscriptionToServer();
-  await useAuth.getState().refreshProfile();
-
-  // Immediate in-app notification (webhook will send the email, which may arrive slightly later)
-  const userId = useAuth.getState().user?.id;
-  if (userId) {
-    void supabase.from('notifications').insert({
-      user_id: userId,
-      type: 'subscription_expiring' as any,
-      title: 'Pro üyeliğin başladı! 🎉',
-      body: 'Tüm içeriklere erişebilirsin. İyi okumalar!',
-      payload: { product_id: pkg.product.identifier },
-    } as any);
-  }
-
+  await safeInvalidateCustomerInfoCache();
+  // Webhook owns the DB write. Wait briefly then refresh local profile.
+  await waitForWebhookAndRefresh();
   return customerInfo;
 }
 
 export async function restorePurchases(): Promise<CustomerInfo> {
   const info = await Purchases.restorePurchases();
-  await syncSubscriptionToServer();
-  await useAuth.getState().refreshProfile();
+  await safeInvalidateCustomerInfoCache();
+  await waitForWebhookAndRefresh();
   return info;
-}
-
-/**
- * Tell our backend to re-validate via the validate-subscription Edge Function.
- * Throws on non-2xx so callers can surface failures instead of silently bypassing.
- */
-export async function syncSubscriptionToServer(): Promise<void> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return;
-  const res = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/validate-subscription`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({}),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`validate-subscription failed (${res.status}): ${text}`);
-  }
 }

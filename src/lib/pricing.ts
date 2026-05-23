@@ -3,8 +3,8 @@
  * Keep prices in DB so they can be changed by SQL without a new app release.
  *
  * Product IDs MUST match RevenueCat / App Store / Play Store identifiers:
- *   okuma_student_monthly, okuma_student_yearly,
- *   okuma_expert_monthly,  okuma_expert_yearly
+ *   fonolog_student_monthly, fonolog_student_yearly,
+ *   fonolog_teacher_monthly, fonolog_teacher_yearly
  */
 import { supabase } from './supabase';
 

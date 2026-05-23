@@ -11,9 +11,8 @@
 // ─── Enums ───────────────────────────────────────────────
 export type UserRole           = 'student' | 'teacher' | 'admin';
 export type SubscriptionStatus = 'free' | 'trial' | 'active' | 'student' | 'expert';
-export type AssignmentStatus   = 'assigned' | 'in_progress' | 'completed' | 'skipped' | 'cancelled';
+export type HomeworkStatus     = 'assigned' | 'completed' | 'overdue';
 export type MilestoneStatus    = 'pending' | 'in_progress' | 'completed' | 'skipped';
-export type ItemSlot           = 'hat' | 'shirt' | 'shoes' | 'acc' | 'bg';
 export type ItemRarity         = 'common' | 'rare' | 'legendary';
 export type NoteType           = 'observation' | 'progress' | 'concern' | 'recommendation' | 'parent_message';
 
@@ -25,30 +24,35 @@ export type XpReason =
   | 'dailyLogin' | 'streak3Days' | 'streak7Days' | 'streak30Days';
 
 export type NotificationType =
-  | 'assignment_new' | 'assignment_completed' | 'assignment_due_soon'
+  | 'homework_new' | 'homework_completed' | 'homework_overdue' | 'homework_due_soon'
   | 'milestone_due' | 'milestone_completed'
   | 'streak_reminder' | 'xp_milestone'
-  | 'subscription_expiring' | 'subscription_expired'
+  | 'subscription_started' | 'subscription_renewed'
+  | 'subscription_expiring' | 'subscription_expired' | 'subscription_cancelled'
+  | 'new_user_signup' | 'admin_subscription_event' | 'admin_account_removed'
   | 'teacher_note' | 'teacher_message';
 
 // ─── Row types ───────────────────────────────────────────
 export interface ProfileRow {
-  id:                    string;
-  full_name:             string;
-  email:                 string;
-  role:                  UserRole;
-  subscription_status:   SubscriptionStatus;
-  subscription_expires:  string | null;
-  child_age:             number | null;
-  child_avatar_emoji:    string | null;
-  device_push_token:     string | null;
-  role_locked_at:        string | null;
-  school_name:           string | null;
-  planned_students:      number | null;
-  teacher_age:           number | null;
-  planned_plan:          'monthly' | 'yearly' | null;
-  created_at:            string;
-  updated_at:            string;
+  id:                     string;
+  full_name:              string;
+  email:                  string;
+  role:                   UserRole;
+  subscription_status:    SubscriptionStatus;
+  subscription_expires:   string | null;
+  child_age:              number | null;
+  child_avatar_emoji:     string | null;
+  device_push_token:      string | null;
+  role_locked_at:         string | null;
+  school_name:            string | null;
+  planned_students:       number | null;
+  teacher_age:            number | null;
+  planned_plan:           'monthly' | 'yearly' | null;
+  is_active:              boolean;
+  expiry_warning_sent_at: string | null;
+  welcome_email_sent_at:  string | null;
+  created_at:             string;
+  updated_at:             string;
 }
 
 export interface CategoryRow {
@@ -100,32 +104,47 @@ export interface SessionLogRow {
   created_at:        string;
 }
 
-export interface CharacterItemRow {
+export interface CharacterBaseRow {
   id:            string;
   name:          string;
-  description:   string;
-  slot:          ItemSlot;
-  rarity:        ItemRarity;
+  description:   string | null;
+  asset_url:     string;
+  asset_type:    'svg' | 'png' | 'lottie';
   unlock_xp:     number;
-  asset_path:    string;
-  is_active:     boolean;
   display_order: number;
+  is_active:     boolean;
   created_at:    string;
 }
 
+export interface CharacterVariantRow {
+  id:                  string;
+  base_character_id:   string;
+  name:                string;
+  description:         string | null;
+  asset_url:           string;
+  asset_type:          'svg' | 'png' | 'lottie';
+  unlock_xp:           number;
+  rarity:              ItemRarity;
+  display_order:       number;
+  is_active:           boolean;
+  created_at:          string;
+}
+
 export interface StudentCharacterRow {
-  student_id:        string;
-  total_xp:          number;
-  level:             number;
-  current_streak:    number;
-  longest_streak:    number;
-  last_active_date:  string | null;
-  equipped_hat:      string | null;
-  equipped_shirt:    string | null;
-  equipped_shoes:    string | null;
-  equipped_acc:      string | null;
-  equipped_bg:       string | null;
-  updated_at:        string;
+  student_id:           string;
+  total_xp:             number;
+  level:                number;
+  current_streak:       number;
+  longest_streak:       number;
+  last_activity_date:   string | null;
+  base_character_id:    string | null;
+  equipped_variant_id:  string | null;
+  current_cycle:        number;
+  current_day:          number;
+  day_completion:       Record<string, string[]>;
+  day_completed_at:     string | null;
+  adaptive_levels:      Record<string, number>;
+  updated_at:           string;
 }
 
 export interface XpTransactionRow {
@@ -139,20 +158,23 @@ export interface XpTransactionRow {
   created_at:    string;
 }
 
-export interface AssignmentRow {
-  id:           string;
-  teacher_id:   string;
-  student_id:   string;
-  title:        string;
-  instructions: string | null;
-  module_ids:   string[];
-  word_ids:     string[];
-  due_at:       string | null;
-  status:       AssignmentStatus;
-  completed_at: string | null;
-  session_id:   string | null;
-  created_at:   string;
-  updated_at:   string;
+export interface HomeworkRow {
+  id:                string;
+  teacher_id:        string;
+  student_id:        string;
+  module_id:         string;
+  word_ids:          string[];
+  title:             string;
+  instructions:      string | null;
+  status:            HomeworkStatus;
+  score:             number | null;
+  teacher_note:      string | null;
+  session_id:        string | null;
+  created_at:        string;
+  due_at:            string;
+  completed_at:      string | null;
+  overdue_at:        string | null;
+  reminder_sent_at:  string | null;
 }
 
 export interface NotificationRow {
@@ -196,10 +218,11 @@ export interface Database {
       words:                   { Row: WordRow;                   Insert: Partial<WordRow>;                   Update: Partial<WordRow>;                   Relationships: [] };
       student_word_progress:   { Row: StudentWordProgressRow;    Insert: Partial<StudentWordProgressRow>;    Update: Partial<StudentWordProgressRow>;    Relationships: [] };
       session_logs:            { Row: SessionLogRow;             Insert: Omit<SessionLogRow, 'id' | 'created_at'>; Update: Partial<SessionLogRow>;          Relationships: [] };
-      character_items:         { Row: CharacterItemRow;          Insert: Partial<CharacterItemRow>;          Update: Partial<CharacterItemRow>;          Relationships: [] };
+      characters_base:         { Row: CharacterBaseRow;          Insert: Partial<CharacterBaseRow>;          Update: Partial<CharacterBaseRow>;          Relationships: [] };
+      character_extras:        { Row: CharacterVariantRow;       Insert: Partial<CharacterVariantRow>;       Update: Partial<CharacterVariantRow>;       Relationships: [] };
       student_character:       { Row: StudentCharacterRow;       Insert: Partial<StudentCharacterRow>;       Update: Partial<StudentCharacterRow>;       Relationships: [] };
       xp_transactions:         { Row: XpTransactionRow;          Insert: Partial<XpTransactionRow>;          Update: Partial<XpTransactionRow>;          Relationships: [] };
-      assignments:             { Row: AssignmentRow;             Insert: Partial<AssignmentRow>;             Update: Partial<AssignmentRow>;             Relationships: [] };
+      homeworks:               { Row: HomeworkRow;               Insert: Partial<HomeworkRow>;               Update: Partial<HomeworkRow>;               Relationships: [] };
       notifications:           { Row: NotificationRow;           Insert: Partial<NotificationRow>;           Update: Partial<NotificationRow>;           Relationships: [] };
       teacher_notes:           { Row: TeacherNoteRow;            Insert: Partial<TeacherNoteRow>;            Update: Partial<TeacherNoteRow>;            Relationships: [] };
     };

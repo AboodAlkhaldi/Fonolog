@@ -7,7 +7,7 @@
  * a handful of display helpers. It no longer decides which modules are
  * playable — call `canPlayModule` from `@/lib/day-progress` for that.
  */
-import type { Profile } from '@/domain';
+import type { ProfileRow as Profile } from './database.types';
 
 export type AccessTier = 'admin' | 'subscribed' | 'trial' | 'free';
 

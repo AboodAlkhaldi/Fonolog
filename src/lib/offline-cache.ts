@@ -9,7 +9,8 @@
  * what's available offline). 100 words is the same cap regardless of tier.
  */
 import { MMKV } from 'react-native-mmkv';
-import type { Category, Word, Profile } from '@/domain';
+import type { Category, Word } from '@/domain';
+import type { ProfileRow as Profile } from '@/lib/database.types';
 
 const TTL_MS = 24 * 60 * 60 * 1000;
 export const OFFLINE_WORD_LIMIT = 100;

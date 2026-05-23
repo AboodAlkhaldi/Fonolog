@@ -11,7 +11,10 @@ import { t } from '@/i18n';
 
 type AnyError = AuthError | Error | { code?: string; message?: string; status?: number } | null | undefined;
 
-export function translateAuthError(err: AnyError): string {
+export function translateAuthError(
+  err: AnyError,
+  context: 'login' | 'register' | 'reset' = 'login',
+): string {
   if (!err) return t('auth.login.errors.generic');
 
   const code    = (err as any)?.code as string | undefined;
@@ -68,5 +71,7 @@ export function translateAuthError(err: AnyError): string {
     return t('authErrors.network');
   }
 
+  if (context === 'register') return t('auth.register.errors.generic');
+  if (context === 'reset')    return t('auth.forgot.errors.generic');
   return t('auth.login.errors.generic');
 }

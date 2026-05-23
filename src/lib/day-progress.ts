@@ -18,7 +18,12 @@
  *
  * Day advancement: on the first session/login of a NEW local calendar day
  * after the student has fully completed their current day (`day_completed_at`
- * is set and < today), current_day rolls forward (Day 7 loops to Day 1).
+ * is set and < today), current_day rolls forward. When day 7 rolls to 1,
+ * `current_cycle` increments so previous-cycle completions stay intact in
+ * `day_completion`.
+ *
+ * Completion key shape: `"{cycle}-{day}"` (e.g. "1-3", "2-1"). Reading code
+ * MUST use `cycleDayKey(cycle, day)`. Never read by bare day string anymore.
  *
  * Completion threshold: a module counts as "done for the day" only when the
  * session finishes with ≥ DAY_COMPLETION_MIN_ACCURACY correct answers.
@@ -37,8 +42,9 @@ import { getAccessTier, type AccessTier } from './access-tier';
 export const DAY_COMPLETION_MIN_ACCURACY = 0.5;
 
 export interface DayProgress {
+  currentCycle:   number;
   currentDay:     number;
-  /** Map of day number → list of module IDs the student finished that day. */
+  /** Map of "{cycle}-{day}" → list of module IDs the student finished that day. */
   completion:     Record<string, string[]>;
   /** Local-date (YYYY-MM-DD) the current day was fully completed, or null. */
   dayCompletedAt: string | null;
@@ -46,10 +52,16 @@ export interface DayProgress {
 
 /** Empty / default progress for a brand-new student (or when the row is missing). */
 export const EMPTY_PROGRESS: DayProgress = {
+  currentCycle:   1,
   currentDay:     1,
   completion:     {},
   dayCompletedAt: null,
 };
+
+/** Build the completion lookup key for a given cycle+day. */
+export function cycleDayKey(cycle: number, day: number): string {
+  return `${cycle}-${day}`;
+}
 
 /** Returns today's local date in YYYY-MM-DD. Uses device timezone (per spec). */
 export function todayLocalISO(): string {
@@ -64,11 +76,11 @@ export function effectiveDay(tier: AccessTier, progress: DayProgress): number {
   return progress.currentDay;
 }
 
-/** Has the student finished every module in `day`'s curriculum? */
+/** Has the student finished every module in `day`'s curriculum (current cycle)? */
 export function isDayComplete(progress: DayProgress, day: number): boolean {
   const required = DAY_CURRICULUM[day] ?? [];
   if (required.length === 0) return false;
-  const done = new Set(progress.completion[String(day)] ?? []);
+  const done = new Set(progress.completion[cycleDayKey(progress.currentCycle, day)] ?? []);
   return required.every((m) => done.has(m));
 }
 
@@ -117,14 +129,21 @@ export function nextPendingGame(profile: Profile | null, progress: DayProgress):
   const today = getTodayGames(profile, progress);
   if (today.length === 0) return null;
   const tier = getAccessTier(profile as any);
-  const dayKey = String(effectiveDay(tier, progress));
-  const done = new Set(progress.completion[dayKey] ?? []);
+  const day  = effectiveDay(tier, progress);
+  const done = new Set(progress.completion[cycleDayKey(progress.currentCycle, day)] ?? []);
   return today.find((m) => !done.has(m)) ?? null;
+}
+
+/** Module IDs the student has finished in their CURRENT cycle's current day. */
+export function todayDoneSet(progress: DayProgress, tier: AccessTier): Set<string> {
+  const day = effectiveDay(tier, progress);
+  return new Set(progress.completion[cycleDayKey(progress.currentCycle, day)] ?? []);
 }
 
 // ─── DB integration ────────────────────────────────────────────────────────
 
 interface DayRow {
+  current_cycle:    number | null;
   current_day:      number | null;
   day_completion:   Record<string, string[]> | null;
   day_completed_at: string | null;
@@ -133,6 +152,7 @@ interface DayRow {
 function rowToProgress(row: DayRow | null | undefined): DayProgress {
   if (!row) return { ...EMPTY_PROGRESS };
   return {
+    currentCycle:   row.current_cycle ?? 1,
     currentDay:     row.current_day ?? 1,
     completion:     row.day_completion ?? {},
     dayCompletedAt: row.day_completed_at,
@@ -143,7 +163,7 @@ function rowToProgress(row: DayRow | null | undefined): DayProgress {
 export async function loadDayProgress(studentId: string): Promise<DayProgress> {
   const { data, error } = await supabase
     .from('student_character')
-    .select('current_day, day_completion, day_completed_at')
+    .select('current_cycle, current_day, day_completion, day_completed_at')
     .eq('student_id', studentId)
     .maybeSingle();
   if (error) {
@@ -155,12 +175,11 @@ export async function loadDayProgress(studentId: string): Promise<DayProgress> {
 
 /**
  * If `day_completed_at` is set and strictly before today's local date, roll
- * `current_day` forward (looping 7 → 1) and reset state for the new day.
+ * `current_day` forward. When wrapping 7 → 1, increment `current_cycle` so
+ * the new cycle's day_completion[cycle-day] keys are fresh and the previous
+ * cycle's history stays in `day_completion`.
  *
- * No-op if free tier — they never advance. Caller is responsible for skipping
- * the call for free users (or pass tier='free' and we'll return as-is).
- *
- * Returns the (possibly new) progress object; persists if a change happened.
+ * No-op for free / admin.
  */
 export async function advanceDayIfNeeded(
   studentId: string,
@@ -171,16 +190,25 @@ export async function advanceDayIfNeeded(
   if (!progress.dayCompletedAt) return progress;
   if (progress.dayCompletedAt >= todayLocalISO()) return progress;
 
-  const newDay = nextDay(progress.currentDay);
+  const newDay   = nextDay(progress.currentDay);
+  const newCycle = newDay === 1 ? progress.currentCycle + 1 : progress.currentCycle;
+
+  // Don't overwrite older buckets — just ensure the new cycle+day key exists.
+  const newKey = cycleDayKey(newCycle, newDay);
+  const nextCompletion = { ...progress.completion };
+  if (!(newKey in nextCompletion)) nextCompletion[newKey] = [];
+
   const next: DayProgress = {
+    currentCycle:   newCycle,
     currentDay:     newDay,
-    completion:     { ...progress.completion, [String(newDay)]: [] },
+    completion:     nextCompletion,
     dayCompletedAt: null,
   };
 
   const { error } = await supabase
     .from('student_character')
     .update({
+      current_cycle:    next.currentCycle,
       current_day:      next.currentDay,
       day_completion:   next.completion,
       day_completed_at: null,
@@ -197,8 +225,8 @@ export async function advanceDayIfNeeded(
 /**
  * Called from session.finish() when the student scores at least the
  * DAY_COMPLETION_MIN_ACCURACY threshold. Appends moduleId to today's
- * completion list, and if that makes today fully complete, stamps
- * day_completed_at with the local date.
+ * (cycle, day) completion bucket, and if that makes today fully complete,
+ * stamps day_completed_at with the local date.
  *
  * Idempotent: re-marking an already-finished module is a no-op.
  * Returns the updated progress (or the original if nothing changed).
@@ -216,14 +244,14 @@ export async function markModuleComplete(
     return { progress, justFinishedDay: false };
   }
 
-  const dayKey = String(day);
-  const existing = progress.completion[dayKey] ?? [];
+  const key = cycleDayKey(progress.currentCycle, day);
+  const existing = progress.completion[key] ?? [];
   if (existing.includes(moduleId)) {
     return { progress, justFinishedDay: false };
   }
 
   const updatedDoneList = [...existing, moduleId];
-  const updatedCompletion = { ...progress.completion, [dayKey]: updatedDoneList };
+  const updatedCompletion = { ...progress.completion, [key]: updatedDoneList };
   const allDone = todayGames.every((m) => updatedDoneList.includes(m));
   const updatedAt = allDone ? todayLocalISO() : progress.dayCompletedAt;
 

@@ -2,7 +2,7 @@
  * Deep-link handling for Supabase auth flows.
  *
  * Supabase password-recovery emails redirect to:
- *   okuma://reset-password#access_token=...&refresh_token=...&type=recovery
+ *   fonolog://reset-password#access_token=...&refresh_token=...&type=recovery
  *
  * The Supabase JS client has `detectSessionInUrl: false` on native (correct —
  * there is no `window.location`), so we parse the URL ourselves and call
@@ -71,7 +71,7 @@ export function setupDeepLinks(
   const handle = async (url: string | null) => {
     if (!url) return;
 
-    // ── Signup confirmation: okuma://verified?...&type=signup ──
+    // ── Signup confirmation: fonolog://verified?...&type=signup ──
     if (url.includes('verified')) {
       const tokens = parseAuthTokens(url);
       if (!tokens || (tokens.type && tokens.type !== 'signup')) return;

@@ -132,28 +132,28 @@ async function processItem(item: QueueItem): Promise<{ ok: boolean; permanent?: 
       }
       if (item.followups?.assignment) {
         const a = item.followups.assignment;
-        await supabase.from('assignments').update({
+        const scorePct = a.total > 0 ? Math.round((a.correct / a.total) * 100) : 0;
+        await supabase.from('homeworks').update({
           status:       'completed',
           completed_at: new Date().toISOString(),
           session_id:   sessionId,
-        }).eq('id', a.id);
+          score:        scorePct,
+        } as any).eq('id', a.id);
 
-        // Notify teacher (in-app)
         await supabase.from('notifications').insert({
           user_id: a.teacher_id,
-          type:    'assignment_completed',
+          type:    'homework_completed',
           title:   'Ödev Tamamlandı',
           body:    `${a.student_name} "${a.title}" ödevini bitirdi (${a.correct}/${a.total} doğru).`,
-          payload: { assignment_id: a.id, student_id: item.payload.student_id, session_id: sessionId, correct: a.correct, total: a.total },
-        });
-        // Push (best-effort)
+          payload: { homework_id: a.id, student_id: item.payload.student_id, session_id: sessionId, correct: a.correct, total: a.total },
+        } as any);
         supabase.functions.invoke('send-push', {
           body: {
             user_id: a.teacher_id,
             title:   'Ödev Tamamlandı',
             body:    `${a.student_name} "${a.title}" ödevini bitirdi.`,
-            type:    'assignment_completed',
-            data:    { assignment_id: a.id, student_id: item.payload.student_id },
+            type:    'homework_completed',
+            data:    { homework_id: a.id, student_id: item.payload.student_id },
           },
         }).catch(() => { /* ignore */ });
       }

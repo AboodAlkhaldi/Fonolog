@@ -14,7 +14,7 @@
  */
 import { supabase } from './supabase';
 import { getAccessTier, type AccessTier } from './access-tier';
-import type { Profile } from '@/domain';
+import type { ProfileRow as Profile } from './database.types';
 
 export type FeatureKey =
   | 'pdf_student'         // student-self PDF

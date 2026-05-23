@@ -42,7 +42,7 @@ export const forgotSchema = z.object({
 });
 
 export const childInfoSchema = z.object({
-  age:         z.number().int().min(3, 'forms.invalid').max(18, 'forms.invalid'),
+  age:         z.number().int().min(5, 'forms.invalid').max(13, 'forms.invalid'),
   avatarEmoji: z.string().min(1, 'forms.required'),
 });
 
