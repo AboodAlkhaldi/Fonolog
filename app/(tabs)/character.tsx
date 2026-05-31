@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, FlatList, ScrollView } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Loading, Badge } from '@/components';
@@ -34,6 +35,7 @@ export default function CharacterTab() {
   const profile       = useAuth((s) => s.profile);
   const impersonating = useAuth((s) => s.impersonating);
   const loadCharacter = useCharacter((s) => s.load);
+  const reloadCharacter = useCharacter((s) => s.reload);
   const equipFromStore = useCharacter((s) => s.equip);
   const storeBases    = useCharacter((s) => s.bases);
   const storeVariants = useCharacter((s) => s.variants);
@@ -54,6 +56,16 @@ export default function CharacterTab() {
     if (!profile?.id) return;
     loadCharacter(profile.id);
   }, [profile?.id, previewing, loadCharacter]);
+
+  // Re-pull on focus so freshly uploaded character art (edited in admin) shows
+  // up without an app restart. Skips the very first focus — the effect above
+  // already did the initial load.
+  useFocusEffect(
+    useCallback(() => {
+      if (previewing || !profile?.id) return;
+      reloadCharacter();
+    }, [previewing, profile?.id, reloadCharacter]),
+  );
 
   const previewStats: import('@/store/character').CharacterStats = {
     total_xp: 0, level: 1, current_streak: 0, longest_streak: 0,

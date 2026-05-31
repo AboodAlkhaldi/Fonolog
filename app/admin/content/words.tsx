@@ -3,9 +3,10 @@ import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Screen, Loading, Button, Input } from '@/components';
+import { Screen, Loading, Button, Input, WordImage } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { contentRepository } from '@/domain';
+import type { Word } from '@/domain';
 import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
@@ -16,6 +17,8 @@ interface WordRow {
   emoji: string;
   audio_url: string | null;
   category_id: string;
+  image_url: string | null;
+  image_type: 'svg' | 'png' | null;
 }
 
 export default function AdminWords() {
@@ -24,7 +27,7 @@ export default function AdminWords() {
   const [search, setSearch] = useState('');
 
   const load = async () => {
-    const { data } = await supabase.from('words').select('id,word_text,emoji,audio_url,category_id').eq('is_active', true).order('word_text');
+    const { data } = await supabase.from('words').select('id,word_text,emoji,audio_url,category_id,image_url,image_type').eq('is_active', true).order('word_text');
     setWords((data ?? []) as WordRow[]);
     setLoading(false);
   };
@@ -83,7 +86,16 @@ export default function AdminWords() {
         keyExtractor={(w) => w.id}
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <Text style={styles.emoji}>{item.emoji}</Text>
+            {item.image_url ? (
+              <WordImage
+                word={{ word: item.word_text, image_url: item.image_url, image_type: item.image_type ?? undefined } as Word}
+                size={40}
+              />
+            ) : (
+              <View style={styles.noImage}>
+                <Ionicons name="image-outline" size={18} color={theme.colors.text.muted} />
+              </View>
+            )}
             <Text style={styles.wordText}>{item.word_text}</Text>
             {item.audio_url ? (
               <Ionicons name="volume-medium" size={16} color={theme.colors.feedback.success} />
@@ -110,7 +122,12 @@ const styles = StyleSheet.create({
     padding: theme.spacing[3], borderRadius: theme.radius.md,
     marginBottom: theme.spacing[2],
   },
-  emoji: { fontSize: 24 },
+  noImage: {
+    width: 40, height: 40,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.background.tertiary,
+    alignItems: 'center', justifyContent: 'center',
+  },
   wordText: { ...theme.typography.body, color: theme.colors.text.primary, flex: 1 },
   dotsBtn: { padding: theme.spacing[1] },
 });

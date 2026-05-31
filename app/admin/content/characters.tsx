@@ -4,6 +4,7 @@ import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Loading, Button, Badge } from '@/components';
+import { CharacterRenderer } from '@/components/character/CharacterRenderer';
 import { supabase } from '@/lib/supabase';
 import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
@@ -17,10 +18,11 @@ const placeholderEmoji = (url: string | null | undefined, fallback = '✨') => {
 
 type Tab = 'base' | 'variants';
 
-interface BaseRow { id: string; name: string; asset_url: string; unlock_xp: number }
+type AssetType = 'svg' | 'png' | 'lottie';
+interface BaseRow { id: string; name: string; asset_url: string; asset_type: AssetType; unlock_xp: number }
 interface VariantRow {
   id: string; base_character_id: string;
-  name: string; asset_url: string; unlock_xp: number;
+  name: string; asset_url: string; asset_type: AssetType; unlock_xp: number;
   rarity: string;
 }
 
@@ -83,7 +85,13 @@ export default function AdminCharacters() {
               style={styles.row}
               onPress={() => router.push(`/admin/content/character-edit/base/${item.id}` as any)}
             >
-              <View style={styles.thumb}><Text style={{ fontSize: 24 }}>{placeholderEmoji(item.asset_url, '🦁')}</Text></View>
+              <View style={styles.thumb}>
+                <CharacterRenderer
+                  base={{ id: item.id, asset_url: item.asset_url, asset_type: item.asset_type }}
+                  size={44}
+                  fallbackEmoji={placeholderEmoji(item.asset_url, '🦁')}
+                />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.name}</Text>
                 <Text style={styles.meta}>{t('admin.content.unlockXp', { xp: item.unlock_xp })}</Text>
@@ -103,7 +111,13 @@ export default function AdminCharacters() {
               style={styles.row}
               onPress={() => router.push(`/admin/content/character-edit/variant/${item.id}` as any)}
             >
-              <View style={styles.thumb}><Text style={{ fontSize: 22 }}>{placeholderEmoji(item.asset_url, '✨')}</Text></View>
+              <View style={styles.thumb}>
+                <CharacterRenderer
+                  variant={{ id: item.id, asset_url: item.asset_url, asset_type: item.asset_type }}
+                  size={44}
+                  fallbackEmoji={placeholderEmoji(item.asset_url, '✨')}
+                />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.name}</Text>
                 <View style={{ flexDirection: 'row', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>

@@ -1,18 +1,37 @@
 /**
  * Word editor — used by both /teacher/word/[id] and /admin/content/word/[id].
- * Auto-syllabifies Turkish, kicks off TTS gen on save.
+ * Auto-syllabifies Turkish, kicks off TTS gen on save, and lets the admin
+ * upload an SVG or PNG illustration to the `word-images` Storage bucket.
+ *
+ * The previous emoji-string input is gone: rendering is via uploaded image
+ * assets so every device shows the same artwork (see WordImage component).
  */
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+// expo-file-system v55 moved the readAsStringAsync / EncodingType API to a
+// `/legacy` subpath. Importing from the bare name gives the new File/Directory
+// classes only — `EncodingType` becomes undefined and crashes the uploader.
+import * as FileSystem from 'expo-file-system/legacy';
 
-import { Screen, Button, Input, Loading } from '@/components';
+import { Screen, Button, Input, Loading, WordImage } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { contentRepository, type Category } from '@/domain';
 import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
+
+// Word illustrations are SVG-only: vector art scales cleanly to every tile
+// size and keeps the asset library uniform. PNG uploads are rejected.
+const IMAGE_TYPE = 'svg' as const;
+
+/** Cheap structural check that a picked file is actually an SVG document. */
+function looksLikeSvg(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  return t.includes('<svg') && t.includes('</svg>');
+}
 
 function autoSyllabify(word: string): string[] {
   const VOWELS = new Set('aeıioöuüAEIİOÖUÜ');
@@ -33,6 +52,16 @@ function autoSyllabify(word: string): string[] {
   return out.length > 0 ? out : [word];
 }
 
+function decode(base64: string): Uint8Array {
+  const binaryString = (globalThis as any).atob
+    ? (globalThis as any).atob(base64)
+    : require('base-64').decode(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
+  return bytes;
+}
+
 export default function WordEditor() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const isNew = id === 'new';
@@ -40,8 +69,13 @@ export default function WordEditor() {
   const [cats, setCats] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState('');
   const [wordText, setWordText] = useState('');
-  const [emoji, setEmoji] = useState('');
   const [syllables, setSyllables] = useState('');
+
+  // Image asset state. `pickedUri` is a local file picked in this session and
+  // not yet uploaded; `currentImageUrl` is the URL already stored on the row.
+  const [pickedUri, setPickedUri] = useState<string | null>(null);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -54,9 +88,9 @@ export default function WordEditor() {
         const { data } = await supabase.from('words').select('*').eq('id', id).maybeSingle();
         if (data) {
           setWordText(data.word_text);
-          setEmoji(data.emoji);
           setSyllables((data.syllables ?? []).join('-'));
           setCategoryId(data.category_id);
+          if (data.image_url) setCurrentImageUrl(data.image_url);
         }
       }
       setLoading(false);
@@ -65,8 +99,57 @@ export default function WordEditor() {
 
   const onAuto = () => setSyllables(autoSyllabify(wordText).join('-'));
 
+  const pickImage = async () => {
+    // SVG-only. expo-image-picker does not pick SVGs reliably across
+    // platforms, so route selection through expo-document-picker which honors
+    // MIME, then validate the file really is an SVG before accepting it.
+    const r = await DocumentPicker.getDocumentAsync({
+      type: ['image/svg+xml', 'image/svg', 'application/octet-stream'],
+      copyToCacheDirectory: true,
+    });
+    if (r.canceled || !r.assets?.[0]) return;
+    const uri = r.assets[0].uri;
+
+    try {
+      const text = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      if (!looksLikeSvg(text)) {
+        showAlert(t('app.error_title'), t('teacher.wordEdit.imageNotSvg'));
+        return;
+      }
+    } catch {
+      showAlert(t('app.error_title'), t('teacher.wordEdit.imageNotSvg'));
+      return;
+    }
+    setPickedUri(uri);
+  };
+
+  const uploadImage = async (recordId: string): Promise<string | null> => {
+    if (!pickedUri) return null;
+    const path = `${recordId}.svg`;
+
+    const base64 = await FileSystem.readAsStringAsync(pickedUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    const bytes = decode(base64);
+
+    const { error } = await supabase.storage
+      .from('word-images')
+      .upload(path, bytes, { contentType: 'image/svg+xml', upsert: true });
+    if (error) {
+      showAlert(t('app.error_title'), `${t('teacher.wordEdit.uploadFailed')} ${error.message}`);
+      return null;
+    }
+    const { data } = supabase.storage.from('word-images').getPublicUrl(path);
+    // Cache-bust: the path is stable (upsert overwrites in place), so without a
+    // changing query param the CDN / device image cache would keep serving the
+    // previous asset after a re-upload.
+    return `${data.publicUrl}?v=${Date.now()}`;
+  };
+
   const onSubmit = async () => {
-    if (!wordText || !emoji || !categoryId) {
+    if (!wordText || !categoryId) {
       showAlert(t('teacher.assignment.incompleteTitle'), t('teacher.wordEdit.incompleteMsg'));
       return;
     }
@@ -74,10 +157,12 @@ export default function WordEditor() {
     const syl = syllables.split('-').map((s) => s.trim()).filter(Boolean);
     const wl = wordText.toLowerCase().trim();
 
-    const payload = {
+    // Insert the row first so we have a stable id for the image path; then
+    // upload and update with the URL. On edit we just upload to the existing
+    // id. This keeps storage paths predictable: <word_id>.<ext>.
+    const basePayload: any = {
       category_id: categoryId,
       word_text: wl,
-      emoji,
       syllables: syl,
       syllable_count: syl.length,
       first_letter: wl[0] ?? '',
@@ -86,9 +171,10 @@ export default function WordEditor() {
       is_active: true,
     };
 
-    let result: { data: any; error: any };
+    let resultId: string | null = null;
+    let resultError: any = null;
+
     if (isNew) {
-      // Check for a soft-deleted word with the same text+category → reactivate instead of insert
       const { data: existing } = await supabase
         .from('words')
         .select('id')
@@ -97,33 +183,61 @@ export default function WordEditor() {
         .eq('is_active', false)
         .maybeSingle();
 
-      result = existing
-        ? await supabase.from('words').update(payload).eq('id', existing.id).select().single()
-        : await supabase.from('words').insert(payload).select().single();
+      const { data, error } = existing
+        ? await supabase.from('words').update(basePayload).eq('id', existing.id).select().single()
+        : await supabase.from('words').insert(basePayload).select().single();
+      resultId = data?.id ?? null;
+      resultError = error;
     } else {
-      result = await supabase.from('words').update(payload).eq('id', id).select().single();
+      const { data, error } = await supabase
+        .from('words').update(basePayload).eq('id', id).select().single();
+      resultId = data?.id ?? null;
+      resultError = error;
     }
 
-    if (result.error) {
-      showAlert(t('app.error_title'), result.error.message);
+    if (resultError || !resultId) {
+      showAlert(t('app.error_title'), resultError?.message ?? '');
       setSubmitting(false);
       return;
     }
 
-    if (result.data?.id) {
-      const { data: { session } } = await supabase.auth.getSession();
-      fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-tts`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word_id: result.data.id }),
-      }).catch(() => {});
+    // Upload any newly-picked image and patch the row with the URL + type.
+    if (pickedUri) {
+      const url = await uploadImage(resultId);
+      if (url) {
+        const { error: imgErr } = await supabase
+          .from('words')
+          .update({ image_url: url, image_type: IMAGE_TYPE } as any)
+          .eq('id', resultId);
+        if (imgErr) {
+          showAlert(t('app.error_title'), imgErr.message);
+          setSubmitting(false);
+          return;
+        }
+      }
     }
+
+    // Kick off TTS generation (fire-and-forget — same as before)
+    const { data: { session } } = await supabase.auth.getSession();
+    fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-tts`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ word_id: resultId }),
+    }).catch(() => {});
 
     contentRepository.invalidate();
     router.back();
   };
 
   if (loading) return <Screen><Loading /></Screen>;
+
+  // Build a preview Word for the WordImage component.
+  const previewWord = {
+    word: wordText,
+    kat: '', syl: [], n: 0, first: '', last: '', rk: null, emoji: '',
+    image_url: pickedUri ?? currentImageUrl ?? undefined,
+    image_type: IMAGE_TYPE,
+  } as any;
 
   return (
     <Screen>
@@ -134,9 +248,32 @@ export default function WordEditor() {
 
       <ScrollView>
         <Input label={t('teacher.wordEdit.wordLabel')} value={wordText} onChangeText={setWordText} autoCapitalize="none" required />
-        <Input label={t('teacher.wordEdit.emojiLabel')} value={emoji} onChangeText={setEmoji} required />
 
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+        <Text style={styles.label}>{t('teacher.wordEdit.imageLabel')}</Text>
+        <View style={styles.imageRow}>
+          {pickedUri || currentImageUrl ? (
+            <WordImage word={previewWord} size={96} />
+          ) : (
+            <View style={styles.placeholderBox}>
+              <Ionicons name="image-outline" size={36} color={theme.colors.text.muted} />
+            </View>
+          )}
+          <View style={{ flex: 1, marginLeft: theme.spacing[3] }}>
+            <Text style={styles.imageHint}>{t('teacher.wordEdit.imageSvgHint')}</Text>
+            <Button
+              label={t('teacher.wordEdit.imagePickSvg')}
+              variant="secondary" size="md" onPress={pickImage}
+              style={{ marginTop: theme.spacing[2] }}
+            />
+          </View>
+        </View>
+        <Text style={styles.imageStatus}>
+          {pickedUri ? t('teacher.wordEdit.imageSelected')
+           : currentImageUrl ? t('teacher.wordEdit.imageCurrent')
+           : t('teacher.wordEdit.imageMissing')}
+        </Text>
+
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: theme.spacing[3] }}>
           <View style={{ flex: 1 }}>
             <Input label={t('teacher.wordEdit.syllablesLabel')} value={syllables} onChangeText={setSyllables}
                    autoCapitalize="none" helper={t('teacher.wordEdit.syllablesHelper')} />
@@ -174,6 +311,26 @@ const styles = StyleSheet.create({
   back: { width: 44, height: 44, justifyContent: 'center', marginLeft: -8 },
   title: { ...theme.typography.h1, color: theme.colors.text.primary, marginBottom: theme.spacing[3] },
   label: { ...theme.typography.bodySmall, color: theme.colors.text.secondary, marginBottom: theme.spacing[2] },
+  imageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: theme.spacing[2],
+  },
+  placeholderBox: {
+    width: 96, height: 96,
+    borderRadius: theme.radius.xl,
+    backgroundColor: theme.colors.background.secondary,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  imageHint: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.text.muted,
+  },
+  imageStatus: {
+    ...theme.typography.caption,
+    color: theme.colors.text.muted,
+    marginBottom: theme.spacing[3],
+  },
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[2], marginBottom: theme.spacing[3] },
   catTile: {
     paddingHorizontal: theme.spacing[3], paddingVertical: theme.spacing[2],
