@@ -131,7 +131,7 @@ Use `fonologpro@gmail.com` as the **Sender** if you want Supabase's built-in mai
 
 ### 2.1 Create the app
 1. Play Console → Create app
-2. Package name: `com.villaakademia.fonolog` (matches `app.json`)
+2. Package name: `com.alisaglam.fonolog` (matches `app.json`)
 3. Default language: Türkçe
 4. Free / paid: Free (in-app purchases handle revenue)
 5. Fill out the basics (store listing, content rating, target audience — choose 5+ / educational)
@@ -168,7 +168,7 @@ You need this so RevenueCat (and `eas submit`) can interact with Play on your be
 
 ### 3.1 Create the app
 1. App Store Connect → My Apps → +
-2. Bundle ID: `com.villaakademia.fonolog`
+2. Bundle ID: `com.alisaglam.fonolog`
 3. Primary language: Turkish
 
 ### 3.2 Create in-app subscription products
@@ -196,8 +196,8 @@ ASC → Apps → Fonolog → App Information → App-Specific Shared Secret → 
 ### 4.1 Create the project
 1. RevenueCat → Create new project → name "Fonolog"
 2. Project Settings → Apps → +
-   - **iOS**: bundle ID `com.villaakademia.fonolog`, upload the ASC API key (`.p8`, Key ID, Issuer ID), paste the App-Specific Shared Secret
-   - **Android**: package name `com.villaakademia.fonolog`, upload `google-play-service-account.json`
+   - **iOS**: bundle ID `com.alisaglam.fonolog`, upload the ASC API key (`.p8`, Key ID, Issuer ID), paste the App-Specific Shared Secret
+   - **Android**: package name `com.alisaglam.fonolog`, upload `google-play-service-account.json`
 
 ### 4.2 Entitlements
 Project → Entitlements → +, create two:

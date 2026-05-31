@@ -14,14 +14,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.villaakademia.fonolog",
+      "bundleIdentifier": "com.alisaglam.fonolog",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Fonolog, telaffuzunu değerlendirmek için mikrofona erişim ister.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.villaakademia.fonolog",
+      "package": "com.alisaglam.fonolog",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FFF8E7"
@@ -73,11 +73,13 @@
         "origin": false
       },
       "eas": {
-        "projectId": "335a0adc-d319-4221-bc5e-c27ed6e5d935"
+        "projectId": "f0b9ea10-0658-453d-8f06-ed36ee8ec8f1"
       }
     },
-    "owner": "aboodalkhaldis-organization",
+    "owner": "alisaglam-organization",
     "runtimeVersion": "1.0.0",
-    "updates": { "url": "https://u.expo.dev/335a0adc-d319-4221-bc5e-c27ed6e5d935" }
+    "updates": {
+      "url": "https://u.expo.dev/335a0adc-d319-4221-bc5e-c27ed6e5d935"
+    }
   }
 }
