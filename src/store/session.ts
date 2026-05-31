@@ -66,6 +66,10 @@ interface SessionState {
   next:     () => void;
   finish:   () => Promise<void>;
   reset:    () => void;
+  /** Memory-game shortcut: synthesise answer logs from a self-contained
+   *  adaptive run and mark the session finished, so the standard result /
+   *  finish() persistence path can reuse the existing XP + streak code. */
+  completeMemorySession: (stats: { correct: number; wrong: number; total: number; maxLevel: number }) => void;
 }
 
 const SESSION_LENGTH_BY_AGE = (age: number | null): number => {
@@ -142,7 +146,7 @@ export const useSession = create<SessionState>((set, get) => ({
       const impersonating = useAuth.getState().impersonating;
       const isAdmin = profile?.role === 'admin';
 
-      if (!opts.assignmentId && !isAdmin) {
+      if (!isAdmin) {
         if (impersonating) {
           // Preview path: gate by the previewing user's own tier.
           const isAlwaysOpen = ALWAYS_OPEN_MODULES.includes(moduleId);
@@ -153,7 +157,21 @@ export const useSession = create<SessionState>((set, get) => ({
               return;
             }
           }
+        } else if (opts.assignmentId) {
+          // Assignment launches: free students get straight in (their world is
+          // day1 + always-open anyway — the gate would never apply to them).
+          // Pro/trial students must still finish today's curriculum before
+          // opening assignments, so the assigned ödev doesn't replace the
+          // student's daily curriculum progression.
+          if (tier !== 'free') {
+            const dayProgress = profile ? await loadDayProgress(profile.id) : null;
+            if (!dayProgress || !canPlayModule(profile, dayProgress, moduleId)) {
+              set({ status: 'locked', errorMessage: 'Ödevi açmadan önce bugünün oyunlarını tamamla.' });
+              return;
+            }
+          }
         } else {
+          // Normal (non-assignment) launches: standard day-progress gate.
           const dayProgress = profile ? await loadDayProgress(profile.id) : null;
           if (!dayProgress || !canPlayModule(profile, dayProgress, moduleId)) {
             set({ status: 'locked', errorMessage: 'Önce bugünün oyunlarını bitir.' });
@@ -237,9 +255,10 @@ export const useSession = create<SessionState>((set, get) => ({
 
   finish: async () => {
     const { moduleId, questions, answers, startedAt, extra, adaptive, xpEarned: liveXp } = get();
-    if (!moduleId) return;
+    console.log('[session.finish] start moduleId=', moduleId, 'questions=', questions.length);
+    if (!moduleId) { console.log('[session.finish] abort — no moduleId'); return; }
     const profile = useAuth.getState().profile;
-    if (!profile) return;
+    if (!profile) { console.log('[session.finish] abort — no profile'); return; }
 
     const total       = questions.length;
     const correctCnt  = answers.filter((a) => a.wasCorrect).length;
@@ -267,7 +286,9 @@ export const useSession = create<SessionState>((set, get) => ({
     // Offline path: skip the direct insert + RPCs and queue the whole bundle
     // for replay when the network comes back. This keeps XP/streaks/assignment
     // completions from being lost when the student plays without connectivity.
-    if (!(await isOnline())) {
+    const online = await isOnline();
+    console.log('[session.finish] isOnline=', online);
+    if (!online) {
       enqueueOfflineWrite({
         kind: 'session_log',
         payload: insertPayload,
@@ -278,6 +299,7 @@ export const useSession = create<SessionState>((set, get) => ({
           ...(extra.assignmentId ? { /* assignment notif filled after fetching teacher_id which we don't have offline */ } : {}),
         },
       });
+      console.log('[session.finish] offline-enqueue done, returning');
       set({ xpEarned: xp });
       return;
     }
@@ -379,6 +401,67 @@ export const useSession = create<SessionState>((set, get) => ({
     lastVerdict: null, lastChosen: null, startedAt: 0, questionShownAt: 0,
     errorMessage: null, xpEarned: 0, extra: {}, adaptive: { ...ADAPTIVE_DEFAULTS },
   }),
+
+  completeMemorySession: (stats) => {
+    console.log('[session.completeMemorySession]', stats);
+    // Synthesise an answers/questions array so the standard result screen +
+    // finish() can persist this run unchanged. Each sub-round counts as one
+    // "question" against the totals; XP is awarded per correct sub-round via
+    // the existing adaptive helper.
+    const { adaptive, questions, startedAt } = get();
+    let liveAdaptive = adaptive;
+    let xp = 0;
+    const synthesisedAnswers: AnswerLog[] = [];
+    const seed = questions[0];
+    const wordId = seed?.word?.id ?? null;
+
+    for (let i = 0; i < stats.correct; i++) {
+      const step = nextAdaptiveState(liveAdaptive, true);
+      liveAdaptive = step.state;
+      xp += step.xpGained;
+      synthesisedAnswers.push({
+        questionId: `mem-${i}`,
+        wordId,
+        chosen:     '__memory_correct__',
+        correct:    '__memory_correct__',
+        wasCorrect: true,
+        msToAnswer: 0,
+      });
+    }
+    for (let i = 0; i < stats.wrong; i++) {
+      const step = nextAdaptiveState(liveAdaptive, false);
+      liveAdaptive = step.state;
+      xp += step.xpGained;
+      synthesisedAnswers.push({
+        questionId: `mem-w-${i}`,
+        wordId,
+        chosen:     '__memory_wrong__',
+        correct:    '__memory_correct__',
+        wasCorrect: false,
+        msToAnswer: 0,
+      });
+    }
+
+    // Fake the question array length to match the round count so progress
+    // ratios in the result screen ("X / total") read correctly.
+    const fauxQuestions = Array.from({ length: stats.total }).map((_, i) => ({
+      id: `mem-q-${i}`,
+      word: seed?.word ?? ({} as any),
+      correct: '__memory_correct__',
+      prompt: '',
+    })) as Question[];
+
+    // Persist the highest reached level into adaptive state so the next run
+    // resumes at maxLevel — mirroring the standard quiz adaptive resume.
+    set({
+      status:    'finished',
+      questions: fauxQuestions,
+      answers:   synthesisedAnswers,
+      xpEarned:  xp,
+      startedAt: startedAt || Date.now(),
+      adaptive:  { ...liveAdaptive, currentLevel: stats.maxLevel },
+    });
+  },
 }));
 
 export const sessionProgress = (s: SessionState): number =>

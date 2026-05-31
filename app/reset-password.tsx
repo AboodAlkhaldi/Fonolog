@@ -26,12 +26,12 @@ export default function ResetPasswordScreen() {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw new AppError(translateAuthError(error), (error as any)?.code);
     },
-    onSuccess: () => {
-      // Navigate first so the screen unmounts immediately and the button leaves
-      // its loading state. signOut runs in the background; the protected-route
-      // hook will keep us on (auth) routes once the auth listener flips status.
+    onSuccess: async () => {
+      // Sign out FIRST so status flips to unauthenticated; otherwise the
+      // protected-route guard bounces /(auth)/login back to the home tab and
+      // the screen reads as stuck. Mirrors handleVazgec exactly.
+      await signOut();
       router.replace('/(auth)/login');
-      signOut().catch((e) => console.warn('[reset-password] signOut:', e));
     },
     onError: alert.setAlert,
   });

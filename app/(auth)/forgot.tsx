@@ -21,8 +21,11 @@ export default function ForgotScreen() {
 
   const mutation = useMutation({
     mutationFn: async (values: ForgotValues) => {
-      const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-        redirectTo: 'fonolog://reset-password',
+      // Use our Brevo HTTP-API edge function instead of supabase.auth's SMTP
+      // path. SMTP delivery via Brevo silently fails for some recipients and
+      // strips our Turkish subject + clickable-link tracking.
+      const { error } = await supabase.functions.invoke('send-password-reset-email', {
+        body: { email: values.email },
       });
       if (error) throw new AppError(translateAuthError(error, 'reset'), (error as any)?.code);
     },

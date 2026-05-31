@@ -12,9 +12,10 @@ import { KeyboardPhonemeQuestion }  from '@/components/session/KeyboardPhonemeQu
 import { AudioPairQuestion }        from '@/components/session/AudioPairQuestion';
 import { ExploreCard }              from '@/components/session/ExploreCard';
 import { SequenceQuestion }         from '@/components/session/SequenceQuestion';
+import { VisualPerceptionQuestion } from '@/components/session/VisualPerceptionQuestion';
 import { QuestionPrompt }         from '@/components/session/QuestionPrompt';
 import { useSession, sessionProgress } from '@/store/session';
-import { getModule } from '@/domain';
+import { getModule, HIDE_PROMPT_TEXT_MODULES } from '@/domain';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
@@ -72,7 +73,9 @@ export default function SessionScreen() {
 
   // When session marks itself finished, navigate to results
   useEffect(() => {
+    console.log('[session.statusEffect]', status, 'moduleId=', moduleId);
     if (status === 'finished') {
+      console.log('[session.navigate] → /session/result');
       router.replace('/session/result');
     }
   }, [status]);
@@ -88,6 +91,7 @@ export default function SessionScreen() {
 
   const moduleDef  = getModule(moduleId);
   const screenType = moduleDef?.screenType;
+  const hidePromptText = HIDE_PROMPT_TEXT_MODULES.has(moduleId);
 
   if (status === 'loading') return <Screen><Loading message={t('session.loading')} /></Screen>;
 
@@ -95,6 +99,21 @@ export default function SessionScreen() {
     return (
       <Screen>
         <ErrorBanner message={errorMessage ?? t('session.error')} />
+        <Button label={t('app.back')} variant="secondary" fullWidth onPress={() => router.back()} />
+      </Screen>
+    );
+  }
+
+  if (status === 'locked') {
+    // Day-progress / tier gate fired. Render an explicit screen with the
+    // reason so the student knows what to do; previously this fell through
+    // to <Loading /> and looked stuck reloading.
+    return (
+      <Screen>
+        <View style={styles.lockedBox}>
+          <Ionicons name="lock-closed" size={48} color={theme.colors.text.muted} />
+          <Text style={styles.lockedText}>{errorMessage ?? t('session.error')}</Text>
+        </View>
         <Button label={t('app.back')} variant="secondary" fullWidth onPress={() => router.back()} />
       </Screen>
     );
@@ -145,6 +164,7 @@ export default function SessionScreen() {
             status={qStatus}
             chosen={lastChosen}
             onChoose={answer}
+            hidePromptText={hidePromptText}
           />
         ) : screenType === 'phoneme' ? (
           <KeyboardPhonemeQuestion
@@ -152,6 +172,7 @@ export default function SessionScreen() {
             status={qStatus}
             chosen={lastChosen}
             onChoose={answer}
+            hidePromptText={hidePromptText}
           />
         ) : screenType === 'explore' ? (
           <ExploreCard
@@ -162,6 +183,13 @@ export default function SessionScreen() {
           />
         ) : screenType === 'sequence' ? (
           <SequenceQuestion
+            question={question}
+            status={qStatus}
+            chosen={lastChosen}
+            onChoose={answer}
+          />
+        ) : screenType === 'visual' ? (
+          <VisualPerceptionQuestion
             question={question}
             status={qStatus}
             chosen={lastChosen}
@@ -185,6 +213,7 @@ export default function SessionScreen() {
             chosen={lastChosen}
             onChoose={answer}
             promptSlot={<QuestionPrompt moduleId={moduleId} question={question} />}
+            hidePromptText={hidePromptText}
           />
         )}
       </View>
@@ -272,5 +301,16 @@ const styles = StyleSheet.create({
     ...theme.typography.h4,
     marginLeft: theme.spacing[2],
     flex:       1,
+  },
+  lockedBox: {
+    alignItems: 'center',
+    paddingVertical: theme.spacing[8],
+    gap: theme.spacing[3],
+  },
+  lockedText: {
+    ...theme.typography.bodyLarge,
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+    paddingHorizontal: theme.spacing[4],
   },
 });

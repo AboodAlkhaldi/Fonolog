@@ -8,6 +8,7 @@ import { useSession } from '@/store/session';
 import { useAuth }    from '@/store/auth';
 import { showAlert }  from '@/store/alert';
 import { getAccessTier } from '@/lib/access-tier';
+import { isOnline } from '@/lib/online-status';
 import { theme } from '@/theme';
 import { t }     from '@/i18n';
 
@@ -28,15 +29,28 @@ export default function SessionResultScreen() {
   const durationS    = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
 
   const [persisted, setPersisted] = useState(false);
+  const [wasOffline, setWasOffline] = useState(false);
 
-  // Persist the session ONCE on mount.
+  // Persist the session ONCE on mount. finish() handles its own offline
+  // queueing — refreshProfile() does not, so we tolerate its failure here
+  // and still flip persisted so the action buttons leave the loading state.
   useEffect(() => {
     let alive = true;
+    console.log('[result.mount] moduleId=', moduleId, 'questions=', questions.length, 'answers=', answers.length);
     (async () => {
-      await finish();
-      await refreshProfile();
+      const online = await isOnline();
+      console.log('[result.isOnline]', online, 'alive=', alive);
+      if (alive) setWasOffline(!online);
+
+      try { await finish(); console.log('[result.finish] done'); }
+      catch (e) { console.warn('[result.finish] failed', e); }
+      try { await refreshProfile(); console.log('[result.refreshProfile] done'); }
+      catch (e) { console.warn('[result.refreshProfile] failed', e); }
+      console.log('[result.afterAwaits] alive=', alive);
       if (!alive) return;
       setPersisted(true);
+
+      if (!online) return; // skip day-completion popup when offline — it relies on session state set by online flows
 
       // Day-completion celebration. finish() sets extra.dayJustCompleted when
       // this session was the one that closed today's curriculum.
@@ -50,7 +64,10 @@ export default function SessionResultScreen() {
         showAlert(t('day.completeTitle'), msg, [{ text: t('day.closeBtn') }]);
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      console.log('[result.unmount] alive→false');
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -75,6 +92,13 @@ export default function SessionResultScreen() {
         <Text style={styles.title}>{t('results.title')}</Text>
         <Text style={styles.subtitle}>{title}</Text>
       </View>
+
+      {wasOffline ? (
+        <View style={styles.offlineCard}>
+          <Ionicons name="cloud-offline-outline" size={20} color={theme.colors.feedback.warningText} />
+          <Text style={styles.offlineText}>{t('online.offlineSessionNotice')}</Text>
+        </View>
+      ) : null}
 
       {/* Score card */}
       <View style={styles.statRow}>
@@ -171,6 +195,21 @@ const styles = StyleSheet.create({
     gap: theme.spacing[3],
   },
   actions: { paddingTop: theme.spacing[2] },
+  offlineCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[2],
+    backgroundColor: theme.colors.feedback.warningSubtle,
+    padding: theme.spacing[3],
+    borderRadius: theme.radius.md,
+    marginHorizontal: theme.spacing[2],
+    marginTop: theme.spacing[3],
+  },
+  offlineText: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.feedback.warningText,
+    flex: 1,
+  },
 });
 
 const statStyles = StyleSheet.create({

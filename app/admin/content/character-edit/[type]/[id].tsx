@@ -4,13 +4,17 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+// Use the legacy subpath — v55 moved readAsStringAsync / EncodingType there.
+import * as FileSystem from 'expo-file-system/legacy';
 
 import { Screen, Button, Input, Loading } from '@/components';
+import { CharacterRenderer } from '@/components/character/CharacterRenderer';
 import { supabase } from '@/lib/supabase';
 import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
+
+const isPlaceholderUrl = (u?: string | null) => !u || u.startsWith('placeholder://');
 
 type Kind = 'base' | 'variant';
 
@@ -27,6 +31,7 @@ export default function CharacterEdit() {
   const [bases, setBases]   = useState<BaseOption[]>([]);
   const [rarity, setRarity] = useState<'common'|'rare'|'legendary'>('common');
   const [assetUri, setAssetUri] = useState<string | null>(null);
+  const [currentAssetUrl, setCurrentAssetUrl] = useState<string | null>(null);
   const [assetType, setAssetType] = useState<'svg'|'png'|'lottie'>('png');
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -51,6 +56,8 @@ export default function CharacterEdit() {
           if ((data as any).base_character_id) setBaseId((data as any).base_character_id);
           if ((data as any).rarity) setRarity((data as any).rarity);
           setAssetType((data as any).asset_type ?? 'png');
+          const url = (data as any).asset_url as string | null;
+          if (!isPlaceholderUrl(url)) setCurrentAssetUrl(url);
         }
       }
       setLoading(false);
@@ -89,7 +96,9 @@ export default function CharacterEdit() {
       .upload(path, arr, { contentType, upsert: true });
     if (error) { showAlert(t('admin.content.loadError'), error.message); return null; }
     const { data } = supabase.storage.from('characters').getPublicUrl(path);
-    return data.publicUrl;
+    // Cache-bust: the path is stable (upsert overwrites in place), so a fresh
+    // query param is required or the CDN / device keeps serving the old asset.
+    return `${data.publicUrl}?v=${Date.now()}`;
   };
 
   const onSubmit = async () => {
@@ -183,6 +192,25 @@ export default function CharacterEdit() {
           </>
         )}
 
+        <Text style={styles.label}>{t('admin.content.assetPreviewLabel')}</Text>
+        <View style={styles.previewRow}>
+          <View style={styles.previewAvatar}>
+            {assetUri || currentAssetUrl ? (
+              <CharacterRenderer
+                base={{ id: 'preview', asset_url: assetUri ?? currentAssetUrl!, asset_type: assetType }}
+                size={84}
+              />
+            ) : (
+              <Ionicons name="image-outline" size={32} color={theme.colors.text.muted} />
+            )}
+          </View>
+          <Text style={styles.previewHint}>
+            {assetUri ? t('admin.content.assetSelected')
+              : currentAssetUrl ? t('admin.content.assetCurrent')
+              : t('admin.content.assetMissing')}
+          </Text>
+        </View>
+
         <Text style={styles.label}>{t('admin.content.assetTypeLabel')}</Text>
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: theme.spacing[3] }}>
           {(['png','svg','lottie'] as const).map((at) => (
@@ -226,4 +254,14 @@ const styles = StyleSheet.create({
   rChipActive: { backgroundColor: theme.colors.brand.primary },
   rChipText: { ...theme.typography.bodySmall, color: theme.colors.text.muted },
   rChipTextActive: { color: theme.colors.text.primary },
+  previewRow: {
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing[3],
+    marginBottom: theme.spacing[3],
+  },
+  previewAvatar: {
+    width: 96, height: 96, borderRadius: 48,
+    backgroundColor: theme.colors.background.secondary,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  previewHint: { ...theme.typography.bodySmall, color: theme.colors.text.muted, flex: 1 },
 });

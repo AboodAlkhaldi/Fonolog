@@ -264,6 +264,18 @@ export const useAuth = create<AuthState>((set, get) => ({
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new AppError(translateAuthError(error), (error as any)?.code);
 
+    // After a recent password change → signOut → signIn cycle, the Supabase JS
+    // client can have its internal session in a transient state where the next
+    // PostgREST query hangs because the auth header is mid-rotation. Force-
+    // install the just-issued session synchronously so the profile fetch below
+    // uses the fresh token instead of waiting on the internal auto-refresh.
+    if (data.session) {
+      await supabase.auth.setSession({
+        access_token:  data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+    }
+
     let profile: Profile | null = null;
     if (data.session?.user) {
       const { data: row, error: profileError } = await supabase
