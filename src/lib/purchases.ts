@@ -18,18 +18,29 @@
  */
 import Purchases, { LOG_LEVEL, type CustomerInfo, type PurchasesPackage } from 'react-native-purchases';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { supabase } from './supabase';
 import { useAuth } from '@/store/auth';
 
 let initialized = false;
 
 /**
- * RC's web SDK (used by Expo Go in browser mode) throws "not supported on web"
- * for `invalidateCustomerInfoCache`. We still want to call it on iOS / Android
- * so the next `getCustomerInfo` returns fresh entitlements; on web we skip.
+ * In Expo Go the native RevenueCat module is unavailable, so the SDK falls back
+ * to its "Browser Mode" web build. That build throws "not supported on web" for
+ * several native-only methods (e.g. invalidateCustomerInfoCache) — and the
+ * rejection escapes our try/catch as an *uncaught* promise. Detect Expo Go up
+ * front and skip those calls entirely. Real dev/standalone builds run native RC.
+ */
+const isExpoGo = Constants.executionEnvironment === 'storeClient';
+
+/**
+ * RC's web SDK (Expo Go browser mode) throws "not supported on web" for
+ * `invalidateCustomerInfoCache`. We still want to call it on a native iOS /
+ * Android build so the next `getCustomerInfo` returns fresh entitlements; in
+ * Expo Go / on web we skip it (it would reject and surface an uncaught error).
  */
 async function safeInvalidateCustomerInfoCache(): Promise<void> {
-  if (Platform.OS === 'web') return;
+  if (Platform.OS === 'web' || isExpoGo) return;
   try { await Purchases.invalidateCustomerInfoCache(); } catch { /* ignore */ }
 }
 

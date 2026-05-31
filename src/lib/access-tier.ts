@@ -66,11 +66,22 @@ export function trialDaysRemaining(profile: Profile | null | undefined): number 
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
 }
 
-/** Map subscription_status to a Turkish display label. */
+/**
+ * Map subscription_status to its canonical Turkish display label.
+ *
+ * Canonical plan names (must match RevenueCat product titles AND
+ * pricing_config.display_name — see DEPLOYMENT.md and subscription-mapping.md):
+ *   - student → 'Öğrenci Pro'  (RC entitlement fonolog_student)
+ *   - expert  → 'Uzman Pro'    (RC entitlement fonolog_teacher)
+ *
+ * `active` is a LEGACY generic status from before the role-specific statuses
+ * existed; new writes from the revenuecat-webhook use `student` / `expert`.
+ * It's kept here only so old rows still render a sensible label.
+ */
 export function subscriptionLabel(status: string | null | undefined): string {
   const map: Record<string, string> = {
     trial:   'Pro Deneme',
-    active:  'Pro Aktif',
+    active:  'Pro Aktif',   // legacy — superseded by student/expert
     student: 'Öğrenci Pro',
     expert:  'Uzman Pro',
     free:    'Ücretsiz',

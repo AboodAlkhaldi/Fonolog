@@ -69,7 +69,7 @@ export interface WordRow {
   id:             string;
   category_id:    string;
   word_text:      string;
-  emoji:          string;
+  emoji:          string | null;
   syllables:      string[];
   syllable_count: number;
   first_letter:   string;
@@ -77,6 +77,8 @@ export interface WordRow {
   rhyme_group:    string | null;
   has_svg:        boolean;
   audio_url:      string | null;
+  image_url:      string | null;
+  image_type:     'svg' | 'png' | null;
   is_active:      boolean;
   created_at:     string;
 }
