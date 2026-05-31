@@ -8,6 +8,8 @@ import { showAlert } from '@/store/alert';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/auth';
 import { contentRepository, listModules } from '@/domain';
+import { ALWAYS_OPEN_MODULES, DAY_CURRICULUM } from '@/domain/day-curriculum';
+import { getAccessTier } from '@/lib/access-tier';
 import { checkUsage, recordUsage } from '@/lib/entitlements';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
@@ -34,6 +36,20 @@ export default function NewAssignment() {
   /** Single-select — only one game per ödev. */
   const [pickedModuleId, setPickedModuleId] = useState<string | null>(null);
 
+  // For module gating: free students can only play Day 1 + always-open games,
+  // so the teacher shouldn't be allowed to assign anything else to them.
+  const FREE_ALLOWED_MODULES = new Set<string>([
+    ...ALWAYS_OPEN_MODULES,
+    ...(DAY_CURRICULUM[1] ?? []),
+  ]);
+  const selectedStudent = students.find((s) => s.id === studentId);
+  const selectedStudentTier = selectedStudent ? getAccessTier(selectedStudent as any) : null;
+  const isModuleAllowed = (moduleId: string) => {
+    if (!selectedStudentTier) return true; // no student picked yet — don't gate
+    if (selectedStudentTier !== 'free') return true; // pro/trial: full access
+    return FREE_ALLOWED_MODULES.has(moduleId);
+  };
+
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -54,7 +70,7 @@ export default function NewAssignment() {
       }
       const { data: s } = await supabase
         .from('profiles')
-        .select('id,full_name,child_avatar_emoji')
+        .select('id,full_name,child_avatar_emoji,role,subscription_status,subscription_expires')
         .in('id', ids)
         .order('full_name');
       setStudents(s ?? []);
@@ -231,16 +247,25 @@ export default function NewAssignment() {
           >
             {modules.map((m) => {
               const selected = pickedModuleId === m.id;
+              const allowed  = isModuleAllowed(m.id);
               return (
                 <Pressable
                   key={m.id}
-                  onPress={() => setPickedModuleId(m.id)}
-                  style={[styles.row, selected && styles.rowSelected]}
+                  onPress={() => { if (allowed) setPickedModuleId(m.id); }}
+                  disabled={!allowed}
+                  style={[
+                    styles.row,
+                    selected && styles.rowSelected,
+                    !allowed && styles.rowLocked,
+                  ]}
                 >
                   <Text style={{ fontSize: 24 }}>{m.icon}</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowText}>{m.title}</Text>
                     <Text style={styles.rowSubtext}>{m.description}</Text>
+                    {!allowed ? (
+                      <Text style={styles.lockNote}>{t('teacher.assignment.modulePlanLocked')}</Text>
+                    ) : null}
                   </View>
                 </Pressable>
               );
@@ -306,6 +331,11 @@ const styles = StyleSheet.create({
   rowLocked:   { opacity: 0.45 },
   rowText: { ...theme.typography.body, color: theme.colors.text.primary },
   rowSubtext: { ...theme.typography.caption, color: theme.colors.text.muted, marginTop: 2 },
+  lockNote: {
+    ...theme.typography.caption,
+    color: theme.colors.feedback.warningText,
+    marginTop: 4,
+  },
   wordTile: {
     flex: 1, margin: 4, padding: 8,
     backgroundColor: theme.colors.background.secondary,

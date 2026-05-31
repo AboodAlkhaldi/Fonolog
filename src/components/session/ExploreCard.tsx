@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 import { theme } from '@/theme';
-import { Button } from '@/components';
+import { Button, WordImage } from '@/components';
 import { SpeakerButton } from './SpeakerButton';
 import type { Question } from '@/domain';
 
@@ -25,7 +25,9 @@ export function ExploreCard({ question, status, onChoose }: Props) {
     <View style={styles.container}>
       <Text style={styles.prompt}>{question.prompt ?? 'Dinle ve keşfet!'}</Text>
 
-      <Text style={styles.emoji}>{question.word.emoji}</Text>
+      <View style={styles.imageWrap}>
+        <WordImage word={question.word} size={140} />
+      </View>
 
       {/* Syllable blocks */}
       <View style={styles.syllableRow}>
@@ -79,8 +81,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: theme.spacing[4],
   },
-  emoji: {
-    fontSize: 88,
+  imageWrap: {
     marginBottom: theme.spacing[4],
   },
   syllableRow: {

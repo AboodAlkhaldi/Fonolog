@@ -2,14 +2,15 @@ export interface Word {
   id?:          string     // UUID when from DB, undefined in seed data
   kat:          string     // category name e.g. 'Hayvanlar'
   word:         string     // Turkish word e.g. 'kalem'
-  emoji:        string     // fallback emoji e.g. '✏️'
+  emoji:        string     // legacy emoji fallback — empty string post v3 image migration
   syl:          string[]   // syllables e.g. ['ka','lem']
   n:            number     // syllable count
   first:        string     // first phoneme/letter
   last:         string     // last phoneme/letter
   rk:           string | null  // rhyme group key e.g. 'em' or null
-  svg?:         string     // inline SVG content if available
   tts_url?:     string     // audio URL from Storage
+  image_url?:   string     // SVG or PNG asset URL in 'word-images' bucket
+  image_type?:  'svg' | 'png'
 }
 
 export interface Category {

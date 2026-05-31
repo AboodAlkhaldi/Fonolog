@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 import { theme } from '@/theme';
-import { Button } from '@/components';
+import { Button, WordImage } from '@/components';
 import { SpeakerButton } from './SpeakerButton';
 import type { Question } from '@/domain';
 
@@ -23,7 +23,7 @@ export function PronunciationQuestion({ question, status, onChoose }: Props) {
       </Text>
 
       <View style={styles.card}>
-        <Text style={styles.emoji}>{question.word.emoji}</Text>
+        <WordImage word={question.word} size={140} />
         <Text style={styles.word}>{question.word.word}</Text>
         <SpeakerButton audioUrl={audioUrl} size={56} style={{ marginTop: theme.spacing[3] }} />
       </View>

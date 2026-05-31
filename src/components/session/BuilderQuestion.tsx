@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { theme, MIN_TOUCH_TARGET } from '@/theme';
+import { WordImage } from '@/components';
 import type { Question } from '@/domain';
 
 interface Props {
@@ -75,9 +76,9 @@ export function BuilderQuestion({ question, status, chosen, onChoose }: Props) {
     <View style={styles.container}>
       {question.prompt ? <Text style={styles.prompt}>{question.prompt}</Text> : null}
 
-      {/* Word emoji */}
-      <View style={styles.emojiCard}>
-        <Text style={styles.emoji}>{question.word.emoji}</Text>
+      {/* Word image */}
+      <View style={styles.wordImageWrap}>
+        <WordImage word={question.word} size={120} />
       </View>
 
       {/* Assembly area */}
@@ -132,6 +133,11 @@ const styles = StyleSheet.create({
     color: theme.colors.text.muted,
     textAlign: 'center',
     marginBottom: theme.spacing[4],
+  },
+  wordImageWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing[5],
   },
   emojiCard: {
     width:  120,

@@ -19,6 +19,9 @@ interface Props {
   promptSlot?:  React.ReactNode;
   /** Show speaker button to play the word's TTS. Default true if word has audio_url. */
   showSpeaker?: boolean;
+  /** Hide the inline `question.prompt` text — used for games where the
+   *  prompt text reveals the target word verbatim. */
+  hidePromptText?: boolean;
 }
 
 /**
@@ -30,7 +33,7 @@ interface Props {
  *   - non-chosen tiles → muted
  */
 export function MultipleChoiceQuestion({
-  question, status, chosen, onChoose, promptSlot, showSpeaker = true,
+  question, status, chosen, onChoose, promptSlot, showSpeaker = true, hidePromptText = false,
 }: Props) {
   const revealed = status === 'revealed';
   const audioUrl = (question.word as any).tts_url ?? (question.word as any).audio_url ?? null;
@@ -56,7 +59,7 @@ export function MultipleChoiceQuestion({
       ) : null}
 
       {/* Question prompt text */}
-      {question.prompt ? <Text style={styles.promptText}>{question.prompt}</Text> : null}
+      {question.prompt && !hidePromptText ? <Text style={styles.promptText}>{question.prompt}</Text> : null}
 
       {/* Options grid */}
       <View style={styles.grid}>

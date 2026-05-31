@@ -33,13 +33,15 @@ export function wordFromRow(row: WordRow, categoryName: string): Word {
     id:    row.id,
     kat:   categoryName,
     word:  row.word_text,
-    emoji: row.emoji,
+    emoji: row.emoji ?? '',
     syl:   row.syllables,
     n:     row.syllable_count,
     first: row.first_letter,
     last:  row.last_letter,
     rk:    row.rhyme_group,
-    tts_url: row.audio_url ?? undefined,
+    tts_url:    row.audio_url ?? undefined,
+    image_url:  row.image_url ?? undefined,
+    image_type: row.image_type ?? undefined,
   };
 }
 

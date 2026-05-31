@@ -1,33 +1,36 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '@/theme';
+import { WordImage } from '@/components';
 import type { Question } from '@/domain';
 
 /**
  * Renders the visual prompt above the answer tiles.
  * Different modules need different prompt visuals:
  *
- *   tani            → emoji card of the word, "Bu nedir?"
- *   tamamla         → first syllable, "ka___"
- *   uyak            → reference word, "Bu kelimeyle hangisi kafiye?"
- *   kategori        → category emoji + "Hangisi … grubundan?"
+ *   tani            → word image, "Bu nedir?"
+ *   tamamla         → word image + "ka___" syllable hint below
+ *   tamamlaBastan   → word image + "___ya" syllable hint below
+ *   uyak            → reference word as text + word image
+ *   kategori        → word image; category text is implied by question.prompt
  *
- * Falls back to a plain emoji card for other modules.
+ * Falls back to a plain word image for other modules.
  */
 export function QuestionPrompt({
   moduleId,
   question,
 }: { moduleId: string; question: Question }) {
-  // tani → big emoji card. The child sees the picture and picks the name.
+  // tani → big image card. The child sees the picture and picks the name.
   if (moduleId === 'tani') {
-    return <EmojiCard emoji={question.word.emoji} />;
+    return <WordImage word={question.word} size={140} />;
   }
 
-  // tamamla → "ka___" (show first syllable, blank the rest)
+  // tamamla → image + "ka___" syllable hint underneath
   if (moduleId === 'tamamla') {
     const syllable = question.word.syl[0];
     return (
       <View style={styles.center}>
+        <WordImage word={question.word} size={140} />
         <Text style={styles.syllableText}>
           {syllable}<Text style={styles.dim}>___</Text>
         </Text>
@@ -35,11 +38,12 @@ export function QuestionPrompt({
     );
   }
 
-  // tamamlaBastan → "___ya" (show last syllable, blank the start — answer is the missing head)
+  // tamamlaBastan → image + "___ya" syllable hint underneath
   if (moduleId === 'tamamlaBastan') {
     const lastSyl = question.word.syl[question.word.syl.length - 1];
     return (
       <View style={styles.center}>
+        <WordImage word={question.word} size={140} />
         <Text style={styles.syllableText}>
           <Text style={styles.dim}>___</Text>{lastSyl}
         </Text>
@@ -47,54 +51,38 @@ export function QuestionPrompt({
     );
   }
 
-  // uyak → reference word styled prominently
+  // uyak / uyakUretim → reference word styled prominently with image
   if (moduleId === 'uyak' || moduleId === 'uyakUretim') {
     return (
       <View style={styles.center}>
         <Text style={styles.refWord}>{question.word.word}</Text>
-        <Text style={styles.dim}>{question.word.emoji}</Text>
+        <WordImage word={question.word} size={120} />
       </View>
     );
   }
 
-  // kategori → emoji card; category text is implied by question.prompt
+  // kategori → image card; category text is implied by question.prompt
   if (moduleId === 'kategori') {
-    return <EmojiCard emoji={question.word.emoji} />;
+    return <WordImage word={question.word} size={140} />;
   }
 
-  // Default: emoji card
-  return <EmojiCard emoji={question.word.emoji} />;
-}
-
-function EmojiCard({ emoji }: { emoji: string }) {
-  return (
-    <View style={styles.emojiCard}>
-      <Text style={styles.emojiText}>{emoji}</Text>
-    </View>
-  );
+  // Default: image card
+  return <WordImage word={question.word} size={140} />;
 }
 
 const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
-  emojiCard: {
-    width:  140,
-    height: 140,
-    borderRadius: theme.radius.xl,
-    backgroundColor: theme.colors.background.secondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...theme.shadow.md,
-  },
-  emojiText: { fontSize: 88 },
   syllableText: {
     ...theme.typography.numberHero,
-    fontSize: 72,
+    fontSize: 56,
     color: theme.colors.text.primary,
+    marginTop: theme.spacing[3],
   },
   refWord: {
     ...theme.typography.h1,
     fontSize: 48,
     color: theme.colors.text.primary,
+    marginBottom: theme.spacing[2],
   },
   dim: {
     color: theme.colors.text.muted,

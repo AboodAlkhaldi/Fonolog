@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 
 import { theme } from '@/theme';
-import { Button } from '@/components';
+import { Button, WordImage } from '@/components';
 import { SpeakerButton } from './SpeakerButton';
 import type { Question } from '@/domain';
 
@@ -13,9 +13,10 @@ interface Props {
   status:   'ready' | 'revealed';
   chosen:   string | null;
   onChoose: (choice: string) => void;
+  hidePromptText?: boolean;
 }
 
-export function KeyboardPhonemeQuestion({ question, status, onChoose }: Props) {
+export function KeyboardPhonemeQuestion({ question, status, onChoose, hidePromptText = false }: Props) {
   const [input, setInput] = useState('');
   const inputRef = useRef<TextInput>(null);
   const audioUrl = (question.word as any).tts_url ?? (question.word as any).audio_url ?? null;
@@ -34,10 +35,12 @@ export function KeyboardPhonemeQuestion({ question, status, onChoose }: Props) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.prompt}>{question.prompt}</Text>
+      {!hidePromptText && question.prompt ? (
+        <Text style={styles.prompt}>{question.prompt}</Text>
+      ) : null}
 
       <View style={styles.card}>
-        <Text style={styles.emoji}>{question.word.emoji}</Text>
+        <WordImage word={question.word} size={120} />
         <Text style={styles.word}>{question.word.word}</Text>
         <SpeakerButton audioUrl={audioUrl} size={48} style={{ marginTop: theme.spacing[3] }} />
       </View>

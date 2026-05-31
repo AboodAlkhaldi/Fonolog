@@ -247,6 +247,17 @@ const tr = {
     next:         'Devam',
     quit:         'Çık',
     quitConfirm:  'Oturumdan çıkmak istediğine emin misin? İlerlemen kaydedilmeyecek.',
+    sequence: {
+      level:        'Seviye {{level}} · {{round}} / {{total}}',
+      showImage:    'Sırayı hatırla! Resimleri seç.',
+      showWord:     'Resimleri iyi izle! Yazılı adlardan seçeceksin.',
+      verdictGood:  'Harikasın! 🌟',
+      verdictRetry: 'Tekrar dene 💪',
+      pickImage:    'Gördüğün {{count}} resmi sırayla seç ({{n}}/{{count}})',
+      pickWord:     'Gördüğün {{count}} resmin adını sırayla seç ({{n}}/{{count}})',
+      reset:        'Sıfırla',
+      streakHint:   '{{streak}}/{{needed}} doğru · seviye atlamak için',
+    },
   },
 
   // ─── Character tab ────────────────────────────────
@@ -371,6 +382,10 @@ const tr = {
       unlockXpLabel:  'Açılma XP',
       rarityLabel:    'Nadirlik',
       assetTypeLabel: 'Asset Türü',
+      assetPreviewLabel: 'Önizleme',
+      assetSelected:  'Yeni dosya seçildi (kaydedince yüklenir)',
+      assetCurrent:   'Mevcut görsel kullanılıyor',
+      assetMissing:   'Henüz görsel yüklenmedi',
       fileSelected:   'Dosya seçildi ✓',
       filePick:       '{{type}} dosyası seç',
       charNameRequired:'Ad zorunlu.',
@@ -453,6 +468,7 @@ const tr = {
       wordsHintRange:  'Kelimeler: {{count}} seçildi (min {{min}}, max {{max}}). Bu aralıkta seç.',
       modulesHint:     'Oyunlar ({{count}} seçildi) · Öğrenci planına göre filtrelendi',
       moduleHintSingle:'Bir tane oyun seç. Her ödev tek bir oyundan oluşur.',
+      modulePlanLocked:'Bu öğrencinin ücretsiz planında kilitli. Pro planda açılır.',
       previewNoStudents: 'Önizleme modunda öğrenci listesi gösterilmez.',
       noStudents:      'Henüz bağlı öğrenci yok.',
       titleLabel:      'Başlık',
@@ -466,6 +482,14 @@ const tr = {
       titleEdit:       'Kelime Düzenle',
       wordLabel:       'Kelime',
       emojiLabel:      'Emoji',
+      imageLabel:      'Görsel (yalnızca SVG)',
+      imageSvgHint:    'Yalnızca SVG dosyaları kabul edilir.',
+      imageNotSvg:     'Geçerli bir SVG dosyası seç. Diğer biçimler kabul edilmez.',
+      imagePickSvg:    'SVG dosyası seç',
+      imageSelected:   'Yeni dosya seçildi (kaydedince yüklenir)',
+      imageCurrent:    'Mevcut görsel kullanılıyor',
+      imageMissing:    'Bu kelimenin henüz görseli yok',
+      uploadFailed:    'Görsel yüklenemedi:',
       syllablesLabel:  'Heceler (- ile ayır)',
       syllablesHelper: 'ör: ka-lem',
       autoBtn:         'Otomatik',
@@ -559,6 +583,7 @@ const tr = {
     required:      'Bu özelliği kullanmak için çevrimiçi olmalısın.',
     requiredTitle: 'İnternet Gerekli',
     offlineNotice: 'Çevrimdışısın. Bazı özellikler kullanılamaz.',
+    offlineSessionNotice: 'Bu oyun çevrimdışı oynandı. İlerlemen bağlantı geri gelince kaydedilecek.',
   },
 
   // ─── Auth error mappings (used by translateAuthError) ─────────────
@@ -635,8 +660,8 @@ const tr = {
 
   // ─── Paywall ───────────────────────────────────────
   paywall: {
-    titleTeacher:     'Öğretmen Pro',
-    titleStudent:     'Pro Üyelik',
+    titleTeacher:     'Uzman Pro',
+    titleStudent:     'Öğrenci Pro',
     subtitleTeacher:  'Öğrencilerine sınırsız erişim sağla.',
     subtitleStudent:  'Tüm içeriği aç ve gelişimini hızlandır.',
     studentF1: '22 kategoride 393+ Türkçe kelime',

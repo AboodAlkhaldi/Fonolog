@@ -31,6 +31,30 @@ export {
   type SessionOptions,
 } from './session';
 
+/**
+ * Modules where the on-screen prompt text should be hidden. For these games,
+ * the student should only see the word image and the answer choices — no
+ * "kalem hangi harfle başlar?" line at the top spelling out the target.
+ * Per product call: prevent the text from being a free hint.
+ */
+export const HIDE_PROMPT_TEXT_MODULES = new Set<string>([
+  'ayirtEtme',
+  'hecele',
+  'sonHece',
+  'uzunKelime',
+  'uyak',
+  'ilkSes',
+  'sonSes',
+  'fonemSilme',
+  'uyakUretim',
+  'ilkHeceSilme',
+  'sonHeceSilme',
+  // Tamamla and Baştan Tamamla render the syllable hint below the image
+  // via QuestionPrompt — the prompt text is redundant on top of that.
+  'tamamla',
+  'tamamlaBastan',
+]);
+
 // ── Repositories ──
 export { contentRepository } from './repositories/content.repository';
 

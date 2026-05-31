@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 
 import { theme } from '@/theme';
+import { WordImage } from '@/components';
 import { SpeakerButton } from './SpeakerButton';
 import type { Question } from '@/domain';
 import type { Word } from '@/domain/types/word.types';
@@ -13,6 +14,7 @@ interface Props {
   status:   'ready' | 'revealed';
   chosen:   string | null;
   onChoose: (choice: string) => void;
+  hidePromptText?: boolean;
 }
 
 /**
@@ -20,7 +22,7 @@ interface Props {
  * Two word cards shown side-by-side, each with an audio button.
  * The student listens to both, then taps the longer word.
  */
-export function AudioPairQuestion({ question, status, chosen, onChoose }: Props) {
+export function AudioPairQuestion({ question, status, chosen, onChoose, hidePromptText = false }: Props) {
   const revealed = status === 'revealed';
   const extra    = (question.extra ?? {}) as { wordA: Word; wordB: Word };
   const wordA    = extra.wordA;
@@ -50,8 +52,12 @@ export function AudioPairQuestion({ question, status, chosen, onChoose }: Props)
 
   return (
     <View style={styles.container}>
-      <Text style={styles.prompt}>{question.prompt ?? 'Hangisi daha uzun?'}</Text>
-      <Text style={styles.subtitle}>Her iki kelimeyi dinle, sonra daha uzun olanı seç.</Text>
+      {!hidePromptText && (
+        <>
+          <Text style={styles.prompt}>{question.prompt ?? 'Hangisi daha uzun?'}</Text>
+          <Text style={styles.subtitle}>Her iki kelimeyi dinle, sonra daha uzun olanı seç.</Text>
+        </>
+      )}
 
       <View style={styles.cardsRow}>
         <WordCard
@@ -141,8 +147,13 @@ function WordCard({ word, audioUrl, state, onPress, syllableCount, revealed }: C
         </View>
       ) : null}
 
-      <Text style={styles.cardEmoji}>{word.emoji}</Text>
-      <Text style={styles.cardWord}>{word.word}</Text>
+      <WordImage word={word} size={88} bg={'transparent'} />
+      <Text
+        style={styles.cardWord}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.55}
+      >{word.word}</Text>
 
       {/* Syllable dots */}
       <View style={styles.syllableDots}>
@@ -203,8 +214,11 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing[5],
     paddingHorizontal: theme.spacing[3],
     alignItems: 'center',
-    minHeight: 230,
+    // Fixed height keeps both cards identical regardless of word length.
+    // Long words shrink (adjustsFontSizeToFit) instead of growing the card.
+    height: 230,
     justifyContent: 'center',
+    overflow: 'hidden',
     ...theme.shadow.md,
   },
   cardCornerIcon: {

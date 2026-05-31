@@ -1,13 +1,38 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * SequenceQuestion — adaptive memory loop for Kelime Dizisi and Sıralı Hatırla.
+ *
+ * Spec (matches fonoloji-atölyesi (2).html):
+ *   - Start at level 3 items per round
+ *   - Each round: flash items one by one (~850ms each), then ask the student
+ *     to select them back in the same order
+ *   - kelimeDizisi (mode='word')  → options are text tiles, student picks names
+ *   - siraliHatirla  (mode='image') → options are image tiles, student picks images
+ *   - +1 level on `streakNeeded` correct in a row (3 normally, 2 after an error)
+ *   - -1 level on any wrong round (range clamped 2..7)
+ *   - 30 total rounds, then we hand back to useSession.completeMemorySession
+ */
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { theme } from '@/theme';
+import { WordImage } from '@/components';
 import type { Question } from '@/domain';
 import type { Word } from '@/domain/types/word.types';
+import { useSession } from '@/store/session';
+import { t } from '@/i18n';
 
-const FLASH_MS = 850;   // each word shown for ~0.85 s (matches HTML reference)
-const PAUSE_MS = 300;
+const FLASH_MS         = 850;
+const PAUSE_MS         = 250;
+const FEEDBACK_MS      = 1000;
+const TOTAL_ROUNDS     = 30;
+const START_LEVEL      = 3;
+const MIN_LEVEL        = 2;
+const MAX_LEVEL        = 7;
+const STREAK_NORMAL    = 3;
+const STREAK_POST_ERR  = 2;
+
+type Mode = 'word' | 'image';
 
 interface Props {
   question: Question;
@@ -16,279 +41,487 @@ interface Props {
   onChoose: (choice: string) => void;
 }
 
-type SeqMode = 'word' | 'image';
+function shuffle<T>(arr: T[]): T[] {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
-export function SequenceQuestion({ question, status, onChoose }: Props) {
-  const sequence: Word[] = (question.extra?.sequence as Word[] | undefined) ?? [question.word];
-  const options:  Word[] = (question.extra?.options  as Word[] | undefined) ?? [question.word];
-  const mode:     SeqMode = (question.extra?.mode as SeqMode | undefined) ?? 'image';
+/** Hex + alpha → rgba string (e.g. '#10B981' + 0.15 → 'rgba(16,185,129,0.15)') */
+function tint(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8)  & 255;
+  const b = (n)       & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
-  const [phase,    setPhase]    = useState<'flash' | 'recall'>('flash');
+export function SequenceQuestion({ question }: Props) {
+  const completeMemorySession = useSession((s) => s.completeMemorySession);
+
+  const pool: Word[] = (question.extra?.pool as Word[] | undefined) ?? [];
+  const mode: Mode   = ((question.extra?.mode as Mode | undefined) ?? 'image');
+
+  // Module color — siraliHatirla green, kelimeDizisi violet (matches registry).
+  const moduleColor = mode === 'image' ? '#10B981' : '#8B5CF6';
+
+  // ── adaptive state ──
+  const [level,        setLevel]        = useState(START_LEVEL);
+  const [streak,       setStreak]       = useState(0);
+  const [postError,    setPostError]    = useState(false);
+  const [maxLevel,     setMaxLevel]     = useState(START_LEVEL);
+  const [totalDone,    setTotalDone]    = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [wrongCount,   setWrongCount]   = useState(0);
+
+  // ── per-round state ──
+  const [dizi,     setDizi]     = useState<Word[]>([]);
+  const [options,  setOptions]  = useState<Word[]>([]);
+  const [phase,    setPhase]    = useState<'show' | 'select'>('show');
   const [flashIdx, setFlashIdx] = useState(0);
-  const [showWord, setShowWord] = useState(true);
+  const [showItem, setShowItem] = useState(true);
   const [selected, setSelected] = useState<Word[]>([]);
+  const [verdict,  setVerdict]  = useState<'correct' | 'wrong' | null>(null);
 
-  const revealed = status === 'revealed';
+  // Guards against repeated completion calls if the user is still mid-tap
+  // when the 30th round resolves.
+  const completedRef = useRef(false);
 
-  // CRITICAL: reset ALL game state when the question changes. Otherwise the
-  // previous round's flashIdx/selected/phase leaks into the new round and the
-  // game freezes after the first sub-round.
-  useEffect(() => {
-    setPhase('flash');
+  // Build a new round from the pool at the current level.
+  const startRound = (lvl: number) => {
+    const targetLvl = Math.min(lvl, pool.length);
+    const newDizi = shuffle(pool).slice(0, targetLvl);
+    const distractors = shuffle(pool.filter(w => !newDizi.some(d => d.word === w.word)))
+      .slice(0, Math.min(4, Math.max(2, targetLvl - 1)));
+    setDizi(newDizi);
+    setOptions(shuffle([...newDizi, ...distractors]));
     setFlashIdx(0);
-    setShowWord(true);
+    setShowItem(true);
     setSelected([]);
-  }, [question.id]);
+    setVerdict(null);
+    setPhase('show');
+  };
 
-  // Flash phase: each flashIdx fires a show → pause → advance cycle.
+  useEffect(() => { startRound(START_LEVEL); }, []);
+
+  // ── Flash phase: cycle through each dizi item ──
   useEffect(() => {
-    if (phase !== 'flash') return;
-    let cancelled = false;
-    setShowWord(true);
-    const hideTimer = setTimeout(() => {
-      if (cancelled) return;
-      setShowWord(false);
-      setTimeout(() => {
-        if (cancelled) return;
-        const next = flashIdx + 1;
-        if (next >= sequence.length) {
-          setPhase('recall');
-        } else {
-          setFlashIdx(next);
-        }
-      }, PAUSE_MS);
-    }, FLASH_MS);
-    return () => {
-      cancelled = true;
-      clearTimeout(hideTimer);
-    };
-  }, [phase, flashIdx, sequence.length]);
+    if (phase !== 'show') return;
+    if (flashIdx >= dizi.length) {
+      const t = setTimeout(() => setPhase('select'), PAUSE_MS);
+      return () => clearTimeout(t);
+    }
+    setShowItem(true);
+    const hide = setTimeout(() => setShowItem(false), FLASH_MS);
+    const next = setTimeout(() => setFlashIdx((i) => i + 1), FLASH_MS + PAUSE_MS);
+    return () => { clearTimeout(hide); clearTimeout(next); };
+  }, [phase, flashIdx, dizi.length]);
 
-  const tapOption = (word: Word) => {
-    if (revealed || selected.find(w => w.word === word.word)) return;
+  // ── Resolve the current round and apply adaptive rules ──
+  const resolveRound = (ok: boolean) => {
+    setVerdict(ok ? 'correct' : 'wrong');
+    Haptics.notificationAsync(ok ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error).catch(() => {});
+
+    let newLevel = level;
+    let newStreak = streak;
+    let newPostError = postError;
+
+    if (ok) {
+      newStreak = streak + 1;
+      const needed = postError ? STREAK_POST_ERR : STREAK_NORMAL;
+      if (newStreak >= needed) {
+        newLevel = Math.min(MAX_LEVEL, level + 1);
+        newStreak = 0;
+        newPostError = false;
+      }
+    } else {
+      newLevel = Math.max(MIN_LEVEL, level - 1);
+      newStreak = 0;
+      newPostError = true;
+    }
+
+    const newTotal     = totalDone + 1;
+    const newCorrect   = correctCount + (ok ? 1 : 0);
+    const newWrong     = wrongCount   + (ok ? 0 : 1);
+    const newMaxLevel  = Math.max(maxLevel, newLevel);
+
+    const timer = setTimeout(() => {
+      if (newTotal >= TOTAL_ROUNDS) {
+        if (completedRef.current) return;
+        completedRef.current = true;
+        completeMemorySession({
+          correct:  newCorrect,
+          wrong:    newWrong,
+          total:    newTotal,
+          maxLevel: newMaxLevel,
+        });
+        return;
+      }
+      setLevel(newLevel);
+      setStreak(newStreak);
+      setPostError(newPostError);
+      setMaxLevel(newMaxLevel);
+      setTotalDone(newTotal);
+      setCorrectCount(newCorrect);
+      setWrongCount(newWrong);
+      startRound(newLevel);
+    }, FEEDBACK_MS);
+    return () => clearTimeout(timer);
+  };
+
+  // ── Tap handler ──
+  // Both modes (kelimeDizisi = 'word', siraliHatirla = 'image') behave the
+  // same: collect every pick and only judge once ALL slots are filled. We
+  // never resolve on the first mismatched tap — the child places the whole
+  // sequence (and can use "Sıfırla" to restart) before the round is marked
+  // right or wrong. Only then do we compare the full ordered sequence.
+  const onPick = (word: Word) => {
+    if (phase !== 'select' || verdict) return;
+    if (selected.some(s => s.word === word.word)) return;
     Haptics.selectionAsync().catch(() => {});
-    const next = [...selected, word];
-    setSelected(next);
-    if (next.length === sequence.length) {
-      onChoose(next.map(w => w.word).join(','));
+
+    const nextSel = [...selected, word];
+    setSelected(nextSel);
+    if (nextSel.length === dizi.length) {
+      const allMatch = nextSel.every((w, i) => w.word === dizi[i].word);
+      resolveRound(allMatch);
     }
   };
 
-  // ── Flash phase UI ──────────────────────────────────────────────
-  if (phase === 'flash') {
-    const current = sequence[flashIdx];
+  const onResetSlots = () => {
+    if (phase !== 'select' || verdict) return;
+    setSelected([]);
+  };
+
+  // ── Shared top bar ──
+  // The "round number" shown is the one currently in progress (1-based).
+  // Once a round resolves, totalDone increments and the next round becomes
+  // the displayed number; clamped to TOTAL_ROUNDS so it never overshoots.
+  const displayRound = Math.min(totalDone + 1, TOTAL_ROUNDS);
+  const TopBar = (
+    <View style={styles.topRow}>
+      <Text style={[styles.topMeta, { color: moduleColor }]}>
+        {t('session.sequence.level', { level, round: displayRound, total: TOTAL_ROUNDS })}
+      </Text>
+      <Text style={styles.topCorrect}>✓ {correctCount}</Text>
+    </View>
+  );
+
+  // ── Render: SHOW phase ──
+  if (phase === 'show') {
+    const current = dizi[Math.min(flashIdx, dizi.length - 1)];
     return (
       <View style={styles.container}>
-        <Text style={styles.prompt}>Resimleri iyi izle!</Text>
-        <View style={styles.progressDots}>
-          {sequence.map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.dot,
-                i < flashIdx && styles.dotDone,
-                i === flashIdx && showWord && styles.dotActive,
-              ]}
-            />
-          ))}
-        </View>
-        <View style={styles.flashCard}>
-          {showWord ? (
-            <>
-              <Text style={styles.flashEmoji}>{current.emoji}</Text>
-              <Text style={styles.flashWord}>{current.word}</Text>
-            </>
-          ) : (
-            <Text style={styles.flashDots}>•••</Text>
-          )}
+        {TopBar}
+
+        <View style={[styles.showCard, { borderColor: tint(moduleColor, 0.25) }]}>
+          <Text style={[styles.showTitle, { color: moduleColor }]}>
+            {mode === 'image'
+              ? t('session.sequence.showImage')
+              : t('session.sequence.showWord')}
+          </Text>
+
+          <View style={styles.dotsRow}>
+            {dizi.map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.dot,
+                  {
+                    backgroundColor: i < flashIdx
+                      ? moduleColor
+                      : (i === flashIdx && showItem ? tint(moduleColor, 0.5) : theme.colors.border.subtle),
+                  },
+                ]}
+              />
+            ))}
+          </View>
+
+          <View style={styles.flashStack}>
+            {current && showItem ? (
+              <>
+                <WordImage word={current} size={120} />
+                <Text style={styles.flashWord}>{current.word}</Text>
+              </>
+            ) : (
+              <Text style={styles.flashDots}>•••</Text>
+            )}
+          </View>
         </View>
       </View>
     );
   }
 
-  // ── Recall phase UI ─────────────────────────────────────────────
-  const correctWords = question.correct.split(',');
-
+  // ── Render: SELECT phase ──
   return (
     <View style={styles.container}>
-      <Text style={styles.prompt}>
-        {mode === 'image'
-          ? `${sequence.length} resmi gördüğün sırayla seç`
-          : `Gördüğün ${sequence.length} resmin adını sırayla seç`}
-      </Text>
-      <Text style={styles.counter}>{selected.length} / {sequence.length}</Text>
+      {TopBar}
 
-      {/* Order slots */}
-      <View style={styles.orderRow}>
-        {sequence.map((_, i) => {
-          const sel = selected[i];
-          return (
-            <View key={i} style={styles.orderSlot}>
-              {sel ? (
-                mode === 'image' ? (
-                  <Text style={styles.orderEmoji}>{sel.emoji}</Text>
+      {verdict ? (
+        <View style={[
+          styles.verdictBox,
+          verdict === 'correct'
+            ? { backgroundColor: theme.colors.feedback.successSubtle }
+            : { backgroundColor: theme.colors.feedback.errorSubtle },
+        ]}>
+          <Text style={[
+            styles.verdictText,
+            { color: verdict === 'correct' ? theme.colors.feedback.successText : theme.colors.feedback.errorText },
+          ]}>
+            {verdict === 'correct' ? t('session.sequence.verdictGood') : t('session.sequence.verdictRetry')}
+          </Text>
+        </View>
+      ) : null}
+
+      <View style={styles.promptBox}>
+        <Text style={styles.promptText}>
+          {mode === 'image'
+            ? t('session.sequence.pickImage', { count: dizi.length, n: selected.length })
+            : t('session.sequence.pickWord',  { count: dizi.length, n: selected.length })}
+        </Text>
+        <View style={styles.orderRow}>
+          {dizi.map((_, i) => {
+            const sel = selected[i];
+            return (
+              <View
+                key={i}
+                style={[
+                  styles.orderSlot,
+                  sel ? { borderColor: moduleColor, backgroundColor: tint(moduleColor, 0.12) } : null,
+                ]}
+              >
+                {sel ? (
+                  mode === 'image' ? (
+                    <WordImage word={sel} size={38} bg={'transparent'} />
+                  ) : (
+                    <Text style={[styles.orderWord, { color: moduleColor }]} numberOfLines={1}>
+                      {sel.word}
+                    </Text>
+                  )
                 ) : (
-                  <Text style={styles.orderWord}>{sel.word}</Text>
-                )
-              ) : (
-                <Text style={styles.orderEmpty}>{i + 1}</Text>
-              )}
-            </View>
-          );
-        })}
+                  <Text style={styles.orderEmpty}>{i + 1}</Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
       </View>
 
-      {/* Option tiles — text-only for kelimeDizisi, emoji+label for sıralıHatırla */}
       <View style={styles.optGrid}>
         {options.map((word, i) => {
-          const isPicked  = !!selected.find(w => w.word === word.word);
-          const posChosen = selected.findIndex(w => w.word === word.word);
-
-          let bg: string = theme.colors.background.secondary;
-          let bd: string = theme.colors.border.subtle;
-
-          if (isPicked && !revealed) {
-            bg = theme.colors.brand.primary + '33';
-            bd = theme.colors.brand.primary;
-          }
-          if (isPicked && revealed) {
-            const correct = word.word === correctWords[posChosen];
-            bg = correct ? theme.colors.feedback.successSubtle : theme.colors.feedback.errorSubtle;
-            bd = correct ? theme.colors.feedback.success       : theme.colors.feedback.error;
-          }
-
+          const isPicked = !!selected.find(w => w.word === word.word);
           return (
             <Pressable
               key={word.word + i}
-              onPress={() => tapOption(word)}
-              disabled={isPicked || revealed}
+              onPress={() => onPick(word)}
+              disabled={isPicked || !!verdict}
+              style={[
+                styles.optTile,
+                isPicked && { backgroundColor: tint(moduleColor, 0.15), borderColor: moduleColor },
+                !!verdict && styles.optTileDisabled,
+              ]}
               accessibilityRole="button"
               accessibilityLabel={word.word}
-              style={[styles.optTile, { backgroundColor: bg, borderColor: bd }]}
             >
               {mode === 'image' ? (
                 <>
-                  <Text style={styles.optEmoji}>{word.emoji}</Text>
-                  <Text style={styles.optCaption}>{word.word}</Text>
+                  <WordImage word={word} size={56} bg={'transparent'} />
+                  <Text style={styles.optCaption} numberOfLines={1}>{word.word}</Text>
                 </>
               ) : (
-                <Text style={styles.optWordOnly}>{word.word}</Text>
+                <Text style={styles.optWordOnly} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                  {word.word}
+                </Text>
               )}
             </Pressable>
           );
         })}
       </View>
 
-      {!revealed && selected.length > 0 && selected.length < sequence.length ? (
-        <Pressable onPress={() => setSelected([])} style={styles.resetBtn}>
-          <Text style={styles.resetText}>Sıfırla</Text>
-        </Pressable>
-      ) : null}
+      <View style={styles.footerRow}>
+        {!verdict && streak > 0 ? (
+          <Text style={styles.adaptiveHint}>
+            {t('session.sequence.streakHint', { streak, needed: postError ? STREAK_POST_ERR : STREAK_NORMAL })}
+          </Text>
+        ) : <View />}
+        {!verdict && selected.length > 0 && selected.length < dizi.length ? (
+          <Pressable onPress={onResetSlots} style={styles.resetBtn}>
+            <Text style={styles.resetText}>{t('session.sequence.reset')}</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1, paddingHorizontal: theme.spacing[2] },
+
+  topRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: theme.spacing[2],
   },
-  prompt: {
-    ...theme.typography.h3,
-    color: theme.colors.text.primary,
+  topMeta: {
+    ...theme.typography.bodySmall,
+    fontWeight: '800',
+  },
+  topCorrect: {
+    ...theme.typography.bodySmall,
+    fontWeight: '700',
+    color: theme.colors.feedback.successText,
+  },
+
+  showCard: {
+    marginTop: theme.spacing[2],
+    padding: theme.spacing[5],
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    backgroundColor: theme.colors.background.secondary,
+    alignItems: 'center',
+    ...theme.shadow.md,
+  },
+  showTitle: {
+    ...theme.typography.bodyLarge,
+    fontWeight: '800',
     textAlign: 'center',
     marginBottom: theme.spacing[3],
   },
-  counter: {
-    ...theme.typography.caption,
-    color: theme.colors.text.muted,
-    marginBottom: theme.spacing[3],
-  },
-  // ── Flash ──
-  progressDots: {
+  dotsRow: {
     flexDirection: 'row',
-    gap: theme.spacing[2],
+    gap: 8,
+    justifyContent: 'center',
     marginBottom: theme.spacing[4],
   },
-  dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: theme.colors.border.subtle,
-  },
-  dotActive: { backgroundColor: theme.colors.brand.primary },
-  dotDone:   { backgroundColor: theme.colors.feedback.success },
-  flashCard: {
-    backgroundColor: theme.colors.background.secondary,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing[8],
+  dot: { width: 12, height: 12, borderRadius: 6 },
+  flashStack: {
     alignItems: 'center',
-    minWidth: 200,
-    minHeight: 180,
     justifyContent: 'center',
-    ...theme.shadow.md,
+    minHeight: 180,
   },
-  flashEmoji: { fontSize: 80 },
   flashWord: {
     ...theme.typography.h2,
     color: theme.colors.text.primary,
-    marginTop: theme.spacing[2],
+    marginTop: theme.spacing[3],
     letterSpacing: 2,
   },
   flashDots: {
-    fontSize: 32,
+    ...theme.typography.h1,
     color: theme.colors.text.muted,
-    letterSpacing: 8,
+    fontSize: 48,
   },
-  // ── Recall ──
+
+  verdictBox: {
+    paddingVertical: theme.spacing[3],
+    paddingHorizontal: theme.spacing[3],
+    borderRadius: theme.radius.lg,
+    marginBottom: theme.spacing[3],
+    alignItems: 'center',
+  },
+  verdictText: {
+    ...theme.typography.h3,
+    fontWeight: '800',
+  },
+
+  promptBox: {
+    backgroundColor: theme.colors.background.tertiary,
+    borderRadius: theme.radius.lg,
+    paddingVertical: theme.spacing[3],
+    paddingHorizontal: theme.spacing[3],
+    marginBottom: theme.spacing[3],
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+  },
+  promptText: {
+    ...theme.typography.bodySmall,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+    marginBottom: theme.spacing[2],
+  },
   orderRow: {
     flexDirection: 'row',
-    gap: theme.spacing[2],
-    marginBottom: theme.spacing[5],
+    gap: 6,
+    justifyContent: 'center',
+    flexWrap: 'wrap',
   },
   orderSlot: {
-    width: 64,
-    height: 64,
+    width: 52, height: 52,
     borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.background.secondary,
     borderWidth: 2,
+    borderColor: theme.colors.border.subtle,
     borderStyle: 'dashed',
-    borderColor: theme.colors.border.default,
-    backgroundColor: theme.colors.background.tertiary,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 4,
   },
-  orderEmoji: { fontSize: 32 },
-  orderWord:  { ...theme.typography.bodyMedium, color: theme.colors.text.primary },
-  orderEmpty: { ...theme.typography.h3, color: theme.colors.text.muted },
+  orderWord: {
+    ...theme.typography.caption,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  orderEmpty: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.text.muted,
+  },
+
   optGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: theme.spacing[3],
+    justifyContent: 'space-between',
+    gap: 8,
   },
   optTile: {
-    width: 96,
-    minHeight: 88,
+    width: '31%',
     paddingVertical: theme.spacing[3],
     paddingHorizontal: theme.spacing[2],
+    backgroundColor: theme.colors.background.secondary,
     borderRadius: theme.radius.lg,
     borderWidth: 2,
+    borderColor: theme.colors.border.subtle,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 84,
     ...theme.shadow.sm,
   },
-  optEmoji:    { fontSize: 36 },
-  optCaption:  { ...theme.typography.caption, color: theme.colors.text.secondary, marginTop: 2, fontWeight: '600' },
-  optWordOnly: { ...theme.typography.h4, color: theme.colors.text.primary, letterSpacing: 1 },
+  optTileDisabled: { opacity: 0.55 },
+  optCaption: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.text.primary,
+    marginTop: 4,
+  },
+  optWordOnly: {
+    ...theme.typography.h4,
+    color: theme.colors.text.primary,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+  },
+
+  footerRow: {
+    marginTop: theme.spacing[3],
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  adaptiveHint: {
+    ...theme.typography.caption,
+    color: theme.colors.text.muted,
+  },
   resetBtn: {
-    marginTop: theme.spacing[4],
+    paddingHorizontal: theme.spacing[3],
     paddingVertical: theme.spacing[2],
-    paddingHorizontal: theme.spacing[5],
+    backgroundColor: theme.colors.background.tertiary,
+    borderRadius: theme.radius.md,
   },
   resetText: {
-    ...theme.typography.body,
+    ...theme.typography.bodySmall,
     color: theme.colors.text.muted,
-    textDecorationLine: 'underline',
   },
 });
