@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, FlatList, ScrollView } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, Pressable, StyleSheet, FlatList, ScrollView, TextInput } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Screen, Button, Input } from '@/components';
+import { Screen, Button, Input, WordImage } from '@/components';
 import { showAlert } from '@/store/alert';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/auth';
 import { contentRepository, listModules } from '@/domain';
+import type { Word } from '@/domain';
 import { ALWAYS_OPEN_MODULES, DAY_CURRICULUM } from '@/domain/day-curriculum';
 import { getAccessTier } from '@/lib/access-tier';
 import { checkUsage, recordUsage } from '@/lib/entitlements';
@@ -31,6 +32,15 @@ export default function NewAssignment() {
 
   const [allWords, setAllWords] = useState<any[]>([]);
   const [pickedWords, setPickedWords] = useState<Set<string>>(new Set());
+  const [wordQuery, setWordQuery] = useState('');
+
+  // Case-insensitive (Turkish-aware) word search over the full catalog. The
+  // selection Set is keyed by id, so picks persist across searches.
+  const filteredWords = useMemo(() => {
+    const q = wordQuery.trim().toLocaleLowerCase('tr');
+    if (!q) return allWords;
+    return allWords.filter((w) => String(w.word ?? '').toLocaleLowerCase('tr').includes(q));
+  }, [allWords, wordQuery]);
 
   const modules = listModules();
   /** Single-select — only one game per ödev. */
@@ -209,12 +219,33 @@ export default function NewAssignment() {
               count: pickedWords.size, min: MIN_WORDS, max: MAX_WORDS,
             })}
           </Text>
+
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={18} color={theme.colors.text.muted} />
+            <TextInput
+              style={styles.searchInput}
+              value={wordQuery}
+              onChangeText={setWordQuery}
+              placeholder={t('teacher.assignment.wordsSearchPh')}
+              placeholderTextColor={theme.colors.text.muted}
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
+            />
+            {wordQuery.length > 0 ? (
+              <Pressable onPress={() => setWordQuery('')} hitSlop={8}>
+                <Ionicons name="close-circle" size={18} color={theme.colors.text.muted} />
+              </Pressable>
+            ) : null}
+          </View>
+
           <FlatList
             style={{ flex: 1 }}
-            data={allWords}
-            numColumns={3}
+            data={filteredWords}
             keyExtractor={(w) => w.id ?? w.word}
             contentContainerStyle={{ paddingBottom: theme.spacing[3] }}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={<Text style={styles.empty}>{t('teacher.assignment.wordsNoResults')}</Text>}
             renderItem={({ item }) => {
               const selected = pickedWords.has(item.id);
               const atMax = !selected && pickedWords.size >= MAX_WORDS;
@@ -226,10 +257,21 @@ export default function NewAssignment() {
                     selected ? next.delete(item.id) : next.add(item.id);
                     setPickedWords(next);
                   }}
-                  style={[styles.wordTile, selected && styles.wordTileSelected, atMax && styles.rowLocked]}
+                  style={[styles.wordRow, selected && styles.wordRowSelected, atMax && styles.rowLocked]}
                 >
-                  <Text>{item.emoji}</Text>
-                  <Text style={styles.wordTileText}>{item.word}</Text>
+                  {item.image_url ? (
+                    <WordImage word={item as Word} size={36} />
+                  ) : (
+                    <View style={styles.wordRowNoImg}>
+                      <Ionicons name="image-outline" size={18} color={theme.colors.text.muted} />
+                    </View>
+                  )}
+                  <Text style={styles.wordRowText} numberOfLines={1}>{item.word}</Text>
+                  <Ionicons
+                    name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+                    size={22}
+                    color={selected ? theme.colors.brand.primary : theme.colors.border.subtle}
+                  />
                 </Pressable>
               );
             }}
@@ -336,16 +378,43 @@ const styles = StyleSheet.create({
     color: theme.colors.feedback.warningText,
     marginTop: 4,
   },
-  wordTile: {
-    flex: 1, margin: 4, padding: 8,
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: theme.colors.background.secondary,
-    borderRadius: theme.radius.sm,
-    alignItems: 'center',
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+    paddingHorizontal: theme.spacing[3],
+    height: 44,
+    marginBottom: theme.spacing[2],
+  },
+  searchInput: {
+    flex: 1,
+    ...theme.typography.body,
+    color: theme.colors.text.primary,
+    padding: 0,
+  },
+  wordRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: theme.colors.background.secondary,
+    paddingVertical: theme.spacing[3],
+    paddingHorizontal: theme.spacing[3],
+    borderRadius: theme.radius.md,
+    marginBottom: theme.spacing[2],
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  wordTileSelected: { borderColor: theme.colors.brand.primary },
-  wordTileText: { ...theme.typography.caption, color: theme.colors.text.primary },
+  wordRowSelected: {
+    borderColor: theme.colors.brand.primary,
+    backgroundColor: theme.colors.brand.primary + '12',
+  },
+  wordRowNoImg: {
+    width: 36, height: 36,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.background.tertiary,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  wordRowText: { ...theme.typography.body, color: theme.colors.text.primary, flex: 1 },
   empty: {
     ...theme.typography.body,
     color: theme.colors.text.muted,

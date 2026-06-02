@@ -5,6 +5,7 @@ import { SvgXml } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 
 import { theme } from '@/theme';
+import { peekSvg, loadSvg } from '@/lib/svg-cache';
 import type { Word } from '@/domain';
 
 interface Props {
@@ -12,12 +13,6 @@ interface Props {
   size?: number;
   /** Optional override for the container background. */
   bg?:   string;
-}
-
-/** Cheap structural check that fetched text is actually an SVG document. */
-function looksLikeSvg(text: string): boolean {
-  const t = text.trim().toLowerCase();
-  return t.includes('<svg') && t.includes('</svg>');
 }
 
 /**
@@ -44,23 +39,21 @@ export function WordImage({ word, size = 96, bg = theme.colors.background.second
     word.image_url.toLowerCase().split('?')[0].endsWith('.svg')
   );
 
-  // null = still loading, 'invalid' = fetch/validation failed, string = good xml
-  const [svgXml, setSvgXml] = useState<string | 'invalid' | null>(null);
+  // null = still loading, 'invalid' = fetch/validation failed, string = good xml.
+  // Seed synchronously from the cache so an already-fetched/prewarmed SVG paints
+  // on first render — no placeholder flicker (critical for the Görsel Algı grid
+  // that rotates cells every 700ms).
+  const [svgXml, setSvgXml] = useState<string | 'invalid' | null>(() =>
+    isSvg && word.image_url ? (peekSvg(word.image_url) ?? null) : null,
+  );
 
   useEffect(() => {
     if (!isSvg || !word.image_url) { setSvgXml(null); return; }
+    const cached = peekSvg(word.image_url);
+    if (cached !== undefined) { setSvgXml(cached); return; } // instant, no fetch
     let alive = true;
     setSvgXml(null);
-    (async () => {
-      try {
-        const res = await fetch(word.image_url!);
-        const text = await res.text();
-        if (!alive) return;
-        setSvgXml(looksLikeSvg(text) ? text : 'invalid');
-      } catch {
-        if (alive) setSvgXml('invalid');
-      }
-    })();
+    loadSvg(word.image_url).then((val) => { if (alive) setSvgXml(val); });
     return () => { alive = false; };
   }, [isSvg, word.image_url]);
 

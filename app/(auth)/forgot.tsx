@@ -24,10 +24,17 @@ export default function ForgotScreen() {
       // Use our Brevo HTTP-API edge function instead of supabase.auth's SMTP
       // path. SMTP delivery via Brevo silently fails for some recipients and
       // strips our Turkish subject + clickable-link tracking.
-      const { error } = await supabase.functions.invoke('send-password-reset-email', {
+      const { data, error } = await supabase.functions.invoke('send-password-reset-email', {
         body: { email: values.email },
       });
       if (error) throw new AppError(translateAuthError(error, 'reset'), (error as any)?.code);
+      // The function returns { ok, sent }. `sent === false` means a real
+      // recipient existed but Brevo delivery failed — surface it instead of a
+      // false success. `sent` undefined is the enumeration guard for an
+      // invalid/unknown email, which we intentionally report as success.
+      if (data && data.ok && data.sent === false) {
+        throw new AppError(t('auth.forgot.errors.generic'));
+      }
     },
     onError: alert.setAlert,
   });

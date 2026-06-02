@@ -27,7 +27,7 @@ export default function AdminWords() {
   const [search, setSearch] = useState('');
 
   const load = async () => {
-    const { data } = await supabase.from('words').select('id,word_text,emoji,audio_url,category_id,image_url,image_type').eq('is_active', true).order('word_text');
+    const { data } = await supabase.from('words').select('id,word_text,audio_url,category_id,image_url,image_type').eq('is_active', true).order('word_text');
     setWords((data ?? []) as WordRow[]);
     setLoading(false);
   };

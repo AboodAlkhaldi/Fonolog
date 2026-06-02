@@ -20,7 +20,6 @@ import { AppError } from '@/lib/error';
 import { translateAuthError } from '@/lib/auth-errors';
 import { setupDeepLinks } from '@/lib/deep-linking';
 import { offlineCache } from '@/lib/offline-cache';
-import { flushQueue } from '@/lib/offline-queue';
 import { showAlert } from '@/store/alert';
 import { useCharacter } from '@/store/character';
 import { useNotificationsStore } from '@/store/notifications';
@@ -108,6 +107,17 @@ function deriveStatus(session: Session | null, profile: Profile | null): AuthSta
   return 'authenticated';
 }
 
+/**
+ * Single-fetch guard. `initialize()` and `signIn()` own the profile fetch.
+ * Supabase fires extra auth events (a duplicate SIGNED_IN from
+ * signInWithPassword, a TOKEN_REFRESHED from setSession, an INITIAL_SESSION on
+ * listener registration). While an explicit auth flow is in flight, the
+ * onAuthStateChange listener must NOT run its own profile fetch — that second
+ * fetch raced the explicit one and a transient null briefly downgraded the
+ * status to 'unauthenticated', which is the first-login "stuck reloading" bug.
+ */
+let explicitAuthInFlight = false;
+
 export const useAuth = create<AuthState>((set, get) => ({
   status: 'loading',
   session: null,
@@ -146,9 +156,6 @@ export const useAuth = create<AuthState>((set, get) => ({
         profile,
         status: derived === 'loading' ? 'unauthenticated' : derived,
       });
-
-      // Drain any pending offline writes now that we're back online (best-effort).
-      flushQueue().catch(() => { /* ignore */ });
     } catch (e) {
       console.error('[auth] initialize failed:', e);
       set({ status: 'unauthenticated', session: null, user: null, profile: null });
@@ -165,6 +172,14 @@ export const useAuth = create<AuthState>((set, get) => ({
         // user to role-choice / dashboard. The setSession in deep-linking.ts
         // already installed the session, which will trigger onAuthStateChange.
       },
+      () => {
+        // Recovery link that couldn't install a session (expired / already
+        // used / invalid). Still route to the reset-password screen — it's
+        // token-gated and will show an "expired, request a new link" state
+        // when no recovery session is present, instead of stranding the user
+        // on the welcome screen.
+        set({ status: 'needsPasswordReset' });
+      },
     );
 
     supabase.auth.onAuthStateChange(async (event, newSession) => {
@@ -174,16 +189,37 @@ export const useAuth = create<AuthState>((set, get) => ({
         return;
       }
 
+      // Signed out (or any event without a session) → clear and let the
+      // protected route send the user to welcome.
+      if (event === 'SIGNED_OUT' || !newSession?.user) {
+        set({ status: 'unauthenticated', session: null, user: null, profile: null, impersonating: null });
+        return;
+      }
+
+      const prev = get();
+
+      // Single-fetch guarantee: if an explicit auth flow owns the fetch, or we
+      // already hold this same user's profile, just keep the session token
+      // fresh — never re-fetch or re-derive status here. This is what stops the
+      // duplicate SIGNED_IN / TOKEN_REFRESHED / INITIAL_SESSION events from
+      // racing the explicit fetch and momentarily downgrading to
+      // 'unauthenticated'. (We still defer to an in-progress password reset.)
+      const sameUserKnown = !!prev.profile && prev.user?.id === newSession.user.id;
+      if ((explicitAuthInFlight || sameUserKnown) && prev.status !== 'needsPasswordReset') {
+        set({ session: newSession, user: newSession.user });
+        return;
+      }
+
+      // Genuine new authentication not yet reflected in state (e.g. an
+      // email-verification deep link). This is the ONE place the listener
+      // fetches a profile.
       try {
-        let p: Profile | null = null;
-        if (newSession?.user) {
-          const { data } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', newSession.user.id)
-            .maybeSingle();
-          p = (data as Profile) ?? null;
-        }
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', newSession.user.id)
+          .maybeSingle();
+        let p = (data as Profile) ?? null;
 
         // If a deactivated account just confirmed their email (re-registration),
         // reactivate it so they continue from where they left off. Also fire
@@ -192,15 +228,15 @@ export const useAuth = create<AuthState>((set, get) => ({
           await supabase
             .from('profiles')
             .update({ is_active: true } as any)
-            .eq('id', newSession!.user.id);
+            .eq('id', newSession.user.id);
           p = { ...p, is_active: true } as any;
           supabase.functions.invoke('send-welcome-back-email', {
-            body: { user_id: newSession!.user.id },
+            body: { user_id: newSession.user.id },
           }).catch((e) => console.warn('[auth] welcome-back email failed', e));
         } else if (
           event === 'SIGNED_IN' &&
           p &&
-          newSession?.user?.email_confirmed_at &&
+          newSession.user.email_confirmed_at &&
           !(p as any).welcome_email_sent_at
         ) {
           // First-time verification: fire welcome email (idempotent on the
@@ -211,25 +247,26 @@ export const useAuth = create<AuthState>((set, get) => ({
         }
 
         // If a recovery deep-link already flipped us to needsPasswordReset,
-        // preserve that ONLY while a session is present — setSession from the
-        // deep-link fires SIGNED_IN which would otherwise overwrite recovery
-        // state with 'authenticated'. On SIGNED_OUT (no session) we fall
-        // through so signOut() can complete the transition.
-        if (get().status === 'needsPasswordReset' && newSession?.user) {
-          set({ session: newSession, user: newSession.user, profile: p });
+        // preserve that while a session is present.
+        if (get().status === 'needsPasswordReset') {
+          set({ session: newSession, user: newSession.user, profile: p ?? prev.profile });
           return;
         }
 
-        diffPlanAndAlert(get().profile, p);
+        if (p) offlineCache.setProfile(p);
+        diffPlanAndAlert(prev.profile, p);
         const derived = deriveStatus(newSession, p);
         set({
           session: newSession,
-          user: newSession?.user ?? null,
+          user: newSession.user,
           profile: p,
           status: derived === 'loading' ? 'unauthenticated' : derived,
         });
       } catch (e) {
         console.error('[auth] onAuthStateChange failed:', e);
+        // Network failure while fetching — keep the token fresh but NEVER
+        // downgrade an already-settled session on a transient error.
+        set({ session: newSession, user: newSession.user });
       }
     });
   },
@@ -261,55 +298,60 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   signIn: async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw new AppError(translateAuthError(error), (error as any)?.code);
+    // Own the profile fetch for this flow; suppress the listener's fetch so the
+    // duplicate SIGNED_IN / setSession token events can't race it (see
+    // explicitAuthInFlight). Always cleared in finally.
+    explicitAuthInFlight = true;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw new AppError(translateAuthError(error), (error as any)?.code);
 
-    // After a recent password change → signOut → signIn cycle, the Supabase JS
-    // client can have its internal session in a transient state where the next
-    // PostgREST query hangs because the auth header is mid-rotation. Force-
-    // install the just-issued session synchronously so the profile fetch below
-    // uses the fresh token instead of waiting on the internal auto-refresh.
-    if (data.session) {
-      await supabase.auth.setSession({
-        access_token:  data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      });
-    }
-
-    let profile: Profile | null = null;
-    if (data.session?.user) {
-      const { data: row, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.session.user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error('[auth] signIn: profile fetch error:', profileError);
-        await supabase.auth.signOut();
-        throw new AppError('Profil yüklenemedi. Lütfen tekrar deneyin.');
+      // After a recent password change → signOut → signIn cycle, the Supabase JS
+      // client can have its internal session in a transient state where the next
+      // PostgREST query hangs because the auth header is mid-rotation. Force-
+      // install the just-issued session synchronously so the profile fetch below
+      // uses the fresh token instead of waiting on the internal auto-refresh.
+      if (data.session) {
+        await supabase.auth.setSession({
+          access_token:  data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
       }
-      profile = (row as Profile) ?? null;
+
+      let profile: Profile | null = null;
+      if (data.session?.user) {
+        const { data: row, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.session.user.id)
+          .maybeSingle();
+
+        if (profileError) {
+          console.error('[auth] signIn: profile fetch error:', profileError);
+          await supabase.auth.signOut();
+          throw new AppError('Profil yüklenemedi. Lütfen tekrar deneyin.');
+        }
+        profile = (row as Profile) ?? null;
+      }
+
+      // Block deactivated accounts from signing in with password.
+      if (profile && (profile as any).is_active === false) {
+        await supabase.auth.signOut();
+        throw new AppError('Bu hesap devre dışı bırakıldı. Yeniden kayıt olarak hesabınızı geri yükleyebilirsiniz.');
+      }
+
+      if (profile) offlineCache.setProfile(profile);
+
+      const derived = deriveStatus(data.session, profile);
+      set({
+        session: data.session,
+        user: data.user,
+        profile,
+        status: derived === 'loading' ? 'needsRoleChoice' : derived,
+      });
+    } finally {
+      explicitAuthInFlight = false;
     }
-
-    // Block deactivated accounts from signing in with password.
-    if (profile && (profile as any).is_active === false) {
-      await supabase.auth.signOut();
-      throw new AppError('Bu hesap devre dışı bırakıldı. Yeniden kayıt olarak hesabınızı geri yükleyebilirsiniz.');
-    }
-
-    if (profile) offlineCache.setProfile(profile);
-
-    const derived = deriveStatus(data.session, profile);
-    set({
-      session: data.session,
-      user: data.user,
-      profile,
-      status: derived === 'loading' ? 'needsRoleChoice' : derived,
-    });
-
-    // Drain offline-queued writes now that we're online again.
-    flushQueue().catch(() => { /* ignore */ });
   },
 
   deactivateAccount: async () => {

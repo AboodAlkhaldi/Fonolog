@@ -319,7 +319,7 @@ Before pressing "Submit for Review" on either store:
 - **A user reports a missing subscription:** Run `validate-subscription` from the app's "Restore Purchases" flow. If that doesn't fix it, manually trigger `reconcile-subscriptions` from Supabase Edge Functions UI.
 - **A webhook event was missed:** `reconcile-subscriptions` will catch it within 24h. To replay sooner, copy the raw event JSON from RevenueCat dashboard → Customer history and POST it to the webhook URL with the correct `Authorization` header.
 - **An admin is overwhelmed by purchase emails:** Reduce volume in `revenuecat-webhook/index.ts` — gate the admin email behind `if (type === 'INITIAL_PURCHASE')` again.
-- **Offline queue stuck:** It auto-clears items after 5 failed retries. To force a clear, expose `clearQueue()` from `offline-queue.ts` to a dev menu.
+- **Offline play:** Sessions played without connectivity are intentionally not counted — no DB write, no XP/streak, no queue/replay (`src/store/session.ts` → `finish()`). Homework is online-only.
 
 ---
 
@@ -334,7 +334,6 @@ Before pressing "Submit for Review" on either store:
 | Auth state | `src/store/auth.ts` |
 | Day-based curriculum | `src/domain/day-curriculum.ts` |
 | Offline cache | `src/lib/offline-cache.ts` |
-| Offline queue | `src/lib/offline-queue.ts` |
 | RevenueCat webhook | `supabase/edgeFunctions/revenuecat-webhook/index.ts` |
 | Admin signup email | `supabase/edgeFunctions/admin-signup-notify/index.ts` |
 | Push notifications | `supabase/edgeFunctions/send-push/index.ts` |

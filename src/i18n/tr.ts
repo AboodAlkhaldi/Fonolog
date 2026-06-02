@@ -141,6 +141,11 @@ const tr = {
       submit:          'Şifreyi Kaydet',
       errorShort:      'Şifre en az 8 karakter olmalı.',
       errorMismatch:   'Şifreler eşleşmiyor.',
+      // Token-gated states for the e-mail link flow.
+      expiredTitle:    'Bağlantı geçersiz veya süresi dolmuş',
+      expiredBody:     'Bu şifre sıfırlama bağlantısı artık geçerli değil. Lütfen yeni bir bağlantı talep et.',
+      requestNew:      'Yeni bağlantı iste',
+      expiredAlert:    'Şifre sıfırlama bağlantısının süresi dolmuş veya daha önce kullanılmış. Lütfen yeni bir bağlantı talep et.',
     },
     deactivate: {
       resetPasswordBtn:  'Şifremi Sıfırla',
@@ -466,6 +471,8 @@ const tr = {
       notifFailed:     'Ödev kaydedildi ancak öğrenciye bildirim gönderilemedi. Lütfen tekrar dene veya admin ile iletişime geç.',
       wordsHint:       'Kelimeler ({{count}} seçildi)',
       wordsHintRange:  'Kelimeler: {{count}} seçildi (min {{min}}, max {{max}}). Bu aralıkta seç.',
+      wordsSearchPh:   'Kelime ara...',
+      wordsNoResults:  'Aramanla eşleşen kelime yok.',
       modulesHint:     'Oyunlar ({{count}} seçildi) · Öğrenci planına göre filtrelendi',
       moduleHintSingle:'Bir tane oyun seç. Her ödev tek bir oyundan oluşur.',
       modulePlanLocked:'Bu öğrencinin ücretsiz planında kilitli. Pro planda açılır.',

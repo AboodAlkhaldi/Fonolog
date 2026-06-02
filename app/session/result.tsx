@@ -36,17 +36,14 @@ export default function SessionResultScreen() {
   // and still flip persisted so the action buttons leave the loading state.
   useEffect(() => {
     let alive = true;
-    console.log('[result.mount] moduleId=', moduleId, 'questions=', questions.length, 'answers=', answers.length);
     (async () => {
       const online = await isOnline();
-      console.log('[result.isOnline]', online, 'alive=', alive);
       if (alive) setWasOffline(!online);
 
-      try { await finish(); console.log('[result.finish] done'); }
+      try { await finish(); }
       catch (e) { console.warn('[result.finish] failed', e); }
-      try { await refreshProfile(); console.log('[result.refreshProfile] done'); }
+      try { await refreshProfile(); }
       catch (e) { console.warn('[result.refreshProfile] failed', e); }
-      console.log('[result.afterAwaits] alive=', alive);
       if (!alive) return;
       setPersisted(true);
 
@@ -65,7 +62,6 @@ export default function SessionResultScreen() {
       }
     })();
     return () => {
-      console.log('[result.unmount] alive→false');
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

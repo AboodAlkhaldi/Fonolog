@@ -8,6 +8,7 @@
  */
 import { supabase } from '@/lib/supabase';
 import { offlineCache } from '@/lib/offline-cache';
+import { prewarmSvgs } from '@/lib/svg-cache';
 import { wordsFromRows, categoryFromRow } from '@/domain/adapters';
 import type { Word, Category } from '@/domain/types';
 import type { CategoryRow, WordRow } from '@/lib/database.types';
@@ -78,6 +79,17 @@ class SupabaseContentRepository implements IContentRepository {
 
     await offlineCache.setCategories(this.categoriesCache);
     await offlineCache.setWords(this.wordsCache);
+
+    // Prewarm SVG illustrations in the background so the images for the offline
+    // word pool are cached (markup-fetched) before the first game and remain
+    // available offline. One-time per URL — repeat loads skip cached entries.
+    const svgUrls = this.wordsCache
+      .filter((w) => !!w.image_url && (
+        w.image_type === 'svg' ||
+        w.image_url!.toLowerCase().split('?')[0].endsWith('.svg')
+      ))
+      .map((w) => w.image_url!);
+    prewarmSvgs(svgUrls).catch((e) => console.warn('[content] svg prewarm', e));
   }
 
   private refreshInBackground(): void {

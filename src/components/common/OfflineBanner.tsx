@@ -3,22 +3,21 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { isOnline } from '@/lib/online-status';
-import { queueSize, flushQueue } from '@/lib/offline-queue';
 import { theme } from '@/theme';
 
 const POLL_INTERVAL_MS = 15000;
 
 /**
- * Compact banner that surfaces offline state + pending queued writes.
+ * Compact banner that surfaces offline state.
  *
- * Probes connectivity every 15 s. When the device comes back online and there
- * are queued writes, it flushes them transparently and updates the count.
+ * Probes connectivity every 15 s. Offline play is intentionally NOT counted
+ * (no writes, no queue/replay — see session.finish), so the banner doubles as
+ * a heads-up that progress played while offline won't be saved.
  *
  * Render this near the top of student-facing screens (e.g. the tabs layout).
  */
 export function OfflineBanner() {
   const [online, setOnline] = useState(true);
-  const [pending, setPending] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -26,14 +25,7 @@ export function OfflineBanner() {
 
     const tick = async () => {
       const up = await isOnline();
-      if (!alive) return;
-      setOnline(up);
-      const size = queueSize();
-      setPending(size);
-      if (up && size > 0) {
-        const drained = await flushQueue();
-        if (alive && drained > 0) setPending(queueSize());
-      }
+      if (alive) setOnline(up);
     };
 
     tick();
@@ -45,20 +37,17 @@ export function OfflineBanner() {
     };
   }, []);
 
-  if (online && pending === 0) return null;
+  if (online) return null;
 
-  const offline = !online;
   return (
-    <View style={[styles.bar, offline ? styles.offline : styles.syncing]}>
+    <View style={[styles.bar, styles.offline]}>
       <Ionicons
-        name={offline ? 'cloud-offline-outline' : 'sync-outline'}
+        name="cloud-offline-outline"
         size={16}
-        color={offline ? theme.colors.feedback.errorText : theme.colors.feedback.warningText}
+        color={theme.colors.feedback.errorText}
       />
-      <Text style={[styles.text, { color: offline ? theme.colors.feedback.errorText : theme.colors.feedback.warningText }]}>
-        {offline
-          ? `Çevrimdışısın${pending > 0 ? ` · ${pending} bekleyen` : ''}`
-          : `${pending} kayıt senkronize ediliyor…`}
+      <Text style={[styles.text, { color: theme.colors.feedback.errorText }]}>
+        Çevrimdışısın · bu sırada oynanan oyunlar kaydedilmez
       </Text>
     </View>
   );
@@ -75,6 +64,5 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing[2],
   },
   offline: { backgroundColor: theme.colors.feedback.errorSubtle },
-  syncing: { backgroundColor: theme.colors.feedback.warningSubtle },
   text:    { ...theme.typography.caption, fontWeight: '600' },
 });

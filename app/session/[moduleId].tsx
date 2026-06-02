@@ -73,9 +73,7 @@ export default function SessionScreen() {
 
   // When session marks itself finished, navigate to results
   useEffect(() => {
-    console.log('[session.statusEffect]', status, 'moduleId=', moduleId);
     if (status === 'finished') {
-      console.log('[session.navigate] → /session/result');
       router.replace('/session/result');
     }
   }, [status]);

@@ -89,8 +89,13 @@ export default function PlanDetails() {
             <Text style={styles.label}>{t('planDetails.currentPlan')}</Text>
             <Badge label={statusLabel} variant={statusVariant} />
           </View>
+          {/* Plan NAME comes from the RC pricing row when available; when it
+              isn't resolved yet we fall back to the DB-derived label (the same
+              source as the badge above) so a paid user never sees a
+              contradictory "Ücretsiz Plan". The price line below stays driven
+              by RC pricing. */}
           <Text style={styles.value}>
-            {planRow?.display_name ?? (tier === 'trial' ? t('planDetails.trialFallback') : t('planDetails.freeFallback'))}
+            {planRow?.display_name ?? statusLabel}
           </Text>
           {planRow ? (
             <Text style={styles.metaLine}>{formatPrice(planRow)} / {planRow.period === 'monthly' ? t('planDetails.periodMonth') : t('planDetails.periodYear')}</Text>

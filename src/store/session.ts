@@ -23,7 +23,6 @@ import {
 } from '@/lib/day-progress';
 import { ALWAYS_OPEN_MODULES, getDayForModule } from '@/domain/day-curriculum';
 import { isOnline } from '@/lib/online-status';
-import { enqueue as enqueueOfflineWrite } from '@/lib/offline-queue';
 import { useAuth } from './auth';
 
 export type Verdict   = 'correct' | 'wrong' | null;
@@ -82,6 +81,16 @@ const SESSION_LENGTH_BY_AGE = (age: number | null): number => {
 const XP_PER_CORRECT      = 10;
 const XP_PERFECT_BONUS    = 50;
 const XP_SESSION_COMPLETE = 20;
+
+/** Resolve `p`, or `null` if it hasn't settled within `ms`. Bounds best-effort
+ *  network writes so a half-connected device (isOnline() passed, but PostgREST
+ *  then hangs) can't freeze the result screen forever. */
+function withTimeout<T>(p: PromiseLike<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    Promise.resolve(p),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+  ]);
+}
 
 export const useSession = create<SessionState>((set, get) => ({
   status: 'idle',
@@ -180,6 +189,21 @@ export const useSession = create<SessionState>((set, get) => ({
         }
       }
 
+      // Assignment launches now carry only the assignment id through the route
+      // (see app/learn/assignment/[id].tsx). Resolve the teacher-selected words
+      // here so the session is built from exactly those words — never a random
+      // pool. The homeworks row is the single source of truth. Homework is
+      // online-only, so this fetch always runs with connectivity.
+      if (opts.assignmentId && !(opts.wordIds && opts.wordIds.length > 0)) {
+        const { data: hw } = await supabase
+          .from('homeworks')
+          .select('word_ids')
+          .eq('id', opts.assignmentId)
+          .maybeSingle();
+        const ids = ((hw as any)?.word_ids as string[] | undefined) ?? [];
+        opts = { ...opts, wordIds: ids };
+      }
+
       const ageBased  = SESSION_LENGTH_BY_AGE(profile?.child_age ?? null);
       const wordCap   = maxWordsForTier(tier);
       // Teacher-assigned homework must use ALL selected words regardless of the
@@ -255,10 +279,9 @@ export const useSession = create<SessionState>((set, get) => ({
 
   finish: async () => {
     const { moduleId, questions, answers, startedAt, extra, adaptive, xpEarned: liveXp } = get();
-    console.log('[session.finish] start moduleId=', moduleId, 'questions=', questions.length);
-    if (!moduleId) { console.log('[session.finish] abort — no moduleId'); return; }
+    if (!moduleId) return;
     const profile = useAuth.getState().profile;
-    if (!profile) { console.log('[session.finish] abort — no profile'); return; }
+    if (!profile) return;
 
     const total       = questions.length;
     const correctCnt  = answers.filter((a) => a.wasCorrect).length;
@@ -283,33 +306,31 @@ export const useSession = create<SessionState>((set, get) => ({
     };
     if (extra.assignmentId) insertPayload.assignment_id = extra.assignmentId;
 
-    // Offline path: skip the direct insert + RPCs and queue the whole bundle
-    // for replay when the network comes back. This keeps XP/streaks/assignment
-    // completions from being lost when the student plays without connectivity.
+    // Offline path: per product decision, sessions played without connectivity
+    // are NOT counted at all — no DB write, no XP/streak award, no queue/replay.
+    // We only surface the locally-computed XP on the result screen (which shows
+    // an "offline, not saved" notice). Homework is online-only (the assignment
+    // screen can't fetch its words offline), so nothing assignment-related runs
+    // here when offline.
     const online = await isOnline();
-    console.log('[session.finish] isOnline=', online);
     if (!online) {
-      enqueueOfflineWrite({
-        kind: 'session_log',
-        payload: insertPayload,
-        followups: {
-          xp:       { amount: xp, reason: isPerfect ? 'sessionPerfect' : 'sessionComplete' },
-          streak:   true,
-          adaptive: { module_id: moduleId, level: adaptive.currentLevel },
-          ...(extra.assignmentId ? { /* assignment notif filled after fetching teacher_id which we don't have offline */ } : {}),
-        },
-      });
-      console.log('[session.finish] offline-enqueue done, returning');
       set({ xpEarned: xp });
       return;
     }
 
-    const { data: logRow, error: logErr } = await supabase
-      .from('session_logs')
-      .insert(insertPayload)
-      .select()
-      .single();
+    // Online path. Bound the primary insert with a timeout: if isOnline()
+    // passed but the device is actually half-connected, the write can hang
+    // indefinitely and freeze the result screen. Surface the XP regardless and
+    // bail if the write doesn't settle — an unsaved online attempt is no worse
+    // than the offline case (nothing counted).
+    const inserted = await withTimeout(
+      supabase.from('session_logs').insert(insertPayload).select().single(),
+      12000,
+    );
+    set({ xpEarned: xp });
+    if (!inserted) return;
 
+    const { data: logRow, error: logErr } = inserted;
     if (logErr) console.warn('[session] session_log insert failed', logErr.message);
 
     const sessionId = logRow?.id ?? null;
@@ -392,8 +413,6 @@ export const useSession = create<SessionState>((set, get) => ({
         }).catch((e) => console.warn('[session] send-push failed', e));
       }
     }
-
-    set({ xpEarned: xp });
   },
 
   reset: () => set({
@@ -403,7 +422,6 @@ export const useSession = create<SessionState>((set, get) => ({
   }),
 
   completeMemorySession: (stats) => {
-    console.log('[session.completeMemorySession]', stats);
     // Synthesise an answers/questions array so the standard result screen +
     // finish() can persist this run unchanged. Each sub-round counts as one
     // "question" against the totals; XP is awarded per correct sub-round via

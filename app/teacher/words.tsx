@@ -3,9 +3,10 @@ import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Screen, Loading, Button, Input } from '@/components';
+import { Screen, Loading, Button, Input, WordImage } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { contentRepository } from '@/domain';
+import type { Word } from '@/domain';
 import { showAlert } from '@/store/alert';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
@@ -13,9 +14,10 @@ import { t } from '@/i18n';
 interface WordRow {
   id: string;
   word_text: string;
-  emoji: string;
   audio_url: string | null;
   category_id: string;
+  image_url: string | null;
+  image_type: 'svg' | 'png' | null;
 }
 
 export default function WordsScreen() {
@@ -26,7 +28,7 @@ export default function WordsScreen() {
   const load = async () => {
     const { data } = await supabase
       .from('words')
-      .select('id,word_text,emoji,audio_url,category_id')
+      .select('id,word_text,audio_url,category_id,image_url,image_type')
       .eq('is_active', true)
       .order('word_text');
     setWords((data ?? []) as WordRow[]);
@@ -116,7 +118,16 @@ export default function WordsScreen() {
         keyExtractor={(w) => w.id}
         renderItem={({ item }) => (
           <Pressable style={styles.row} onPress={() => router.push(`/teacher/word/${item.id}` as any)}>
-            <Text style={styles.emoji}>{item.emoji}</Text>
+            {item.image_url ? (
+              <WordImage
+                word={{ word: item.word_text, image_url: item.image_url, image_type: item.image_type ?? undefined } as Word}
+                size={40}
+              />
+            ) : (
+              <View style={styles.noImage}>
+                <Ionicons name="image-outline" size={18} color={theme.colors.text.muted} />
+              </View>
+            )}
             <View style={{ flex: 1 }}>
               <Text style={styles.wordText}>{item.word_text}</Text>
             </View>
@@ -144,6 +155,11 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     marginBottom: theme.spacing[2],
   },
-  emoji: { fontSize: 24 },
+  noImage: {
+    width: 40, height: 40,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.background.tertiary,
+    alignItems: 'center', justifyContent: 'center',
+  },
   wordText: { ...theme.typography.body, color: theme.colors.text.primary },
 });

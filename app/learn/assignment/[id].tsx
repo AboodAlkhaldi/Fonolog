@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Screen, Button, Loading, Badge } from '@/components';
 import { supabase } from '@/lib/supabase';
-import { useSession } from '@/store/session';
 import { getModule } from '@/domain';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
@@ -29,7 +28,6 @@ interface TeacherInfo {
 
 export default function AssignmentDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const start = useSession((s) => s.start);
 
   const [homework, setHomework] = useState<Homework | null>(null);
   const [teacher,  setTeacher]  = useState<TeacherInfo | null>(null);
@@ -64,12 +62,13 @@ export default function AssignmentDetail() {
   const isOverdue   = homework.status === 'overdue';
   const mod         = getModule(homework.module_id);
 
-  const onStart = async () => {
-    await start(homework.module_id, {
-      assignmentId: homework.id,
-      wordIds:      homework.word_ids,
-    });
-    router.push(`/session/${homework.module_id}`);
+  const onStart = () => {
+    // Pass ONLY the assignment id through the route. The session screen runs a
+    // single start() that resolves the teacher-selected words from this id.
+    // Previously we pre-called start() here with the word list, but the session
+    // screen's own boot effect then re-ran start() without it (the route didn't
+    // carry the words) and the second run won — so the student got random words.
+    router.push(`/session/${homework.module_id}?assignmentId=${homework.id}`);
   };
 
   return (

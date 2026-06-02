@@ -43,7 +43,6 @@ export default function WordEditScreen() {
   const [cats, setCats]       = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState<string>('');
   const [wordText,   setWordText]   = useState('');
-  const [emoji,      setEmoji]      = useState('');
   const [syllables,  setSyllables]  = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [loading,    setLoading]    = useState(true);
@@ -57,7 +56,6 @@ export default function WordEditScreen() {
         const { data } = await supabase.from('words').select('*').eq('id', id).maybeSingle();
         if (data) {
           setWordText(data.word_text);
-          setEmoji(data.emoji);
           setSyllables((data.syllables ?? []).join('-'));
           setCategoryId(data.category_id);
         }
@@ -71,7 +69,7 @@ export default function WordEditScreen() {
   };
 
   const onSubmit = async () => {
-    if (!wordText || !emoji || !categoryId) {
+    if (!wordText || !categoryId) {
       showAlert(t('teacher.assignment.incompleteTitle'), t('teacher.wordEdit.incompleteMsg'));
       return;
     }
@@ -82,7 +80,6 @@ export default function WordEditScreen() {
     const payload = {
       category_id:    categoryId,
       word_text:      wordLower,
-      emoji,
       syllables:      syl,
       syllable_count: syl.length,
       first_letter:   wordLower[0] ?? '',
@@ -132,7 +129,6 @@ export default function WordEditScreen() {
 
       <ScrollView>
         <Input label={t('teacher.wordEdit.wordLabel')} value={wordText} onChangeText={setWordText} autoCapitalize="none" required />
-        <Input label={t('teacher.wordEdit.emojiLabel')} value={emoji} onChangeText={setEmoji} required />
 
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
           <View style={{ flex: 1 }}>
