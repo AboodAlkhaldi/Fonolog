@@ -16,7 +16,6 @@ export interface Word {
 export interface Category {
   id:         string
   name:       string
-  level:      number
   color_hex:  string
   emoji:      string
   sort_order: number

@@ -32,7 +32,7 @@ export interface ModuleDefinition {
   science:         string     // academic explanation (for teachers)
   familyTip:       string     // tip for parents
   color:           string     // hex color for this module's theme
-  level:           0 | 1 | 2 | 3 | 5
+  level:           0 | 1 | 2 | 3 | 4 | 5
   screenType:      ScreenType
   generator:       (words: Word[], options?: GeneratorOptions) => Question[]
   requiresPremium: boolean

@@ -127,6 +127,7 @@ export const colors = {
 
     info:           palette.teal[500],
     infoSubtle:     palette.teal[100],
+    infoText:       palette.teal[700],
   },
 
   // ── Action ──

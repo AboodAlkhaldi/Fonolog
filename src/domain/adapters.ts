@@ -61,7 +61,6 @@ export function categoryFromRow(row: CategoryRow): Category {
   return {
     id:         row.id,
     name:       row.name,
-    level:      row.is_premium ? 1 : 0,   // free=0, premium=1
     color_hex:  '#FFC857',                  // default brand yellow; per-cat colors come later
     emoji:      row.emoji,
     sort_order: row.display_order,

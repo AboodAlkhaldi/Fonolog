@@ -60,7 +60,6 @@ export interface CategoryRow {
   name:          string;
   emoji:         string;
   display_order: number;
-  is_premium:    boolean;
   is_active:     boolean;
   created_at:    string;
 }

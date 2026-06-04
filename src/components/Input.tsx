@@ -1,4 +1,4 @@
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -35,6 +35,15 @@ export const Input = forwardRef<TextInput, Props>(function Input({
   const [focused, setFocused] = useState(false);
   const [reveal, setReveal]   = useState(false);
 
+  // Keep an internal ref alongside the forwarded one so tapping anywhere in the
+  // input box (not just the small TextInput hit area) focuses it.
+  const innerRef = useRef<TextInput>(null);
+  const setRefs = (node: TextInput | null) => {
+    innerRef.current = node;
+    if (typeof ref === 'function') ref(node);
+    else if (ref) (ref as React.MutableRefObject<TextInput | null>).current = node;
+  };
+
   const isSecure   = secureTextEntry && !reveal;
   const hasError   = Boolean(error);
   const borderColor = hasError
@@ -52,9 +61,12 @@ export const Input = forwardRef<TextInput, Props>(function Input({
         </Text>
       ) : null}
 
-      <View style={[styles.inputWrap, { borderColor }]}>
+      <Pressable
+        style={[styles.inputWrap, { borderColor }]}
+        onPress={() => innerRef.current?.focus()}
+      >
         <TextInput
-          ref={ref}
+          ref={setRefs}
           style={styles.input}
           placeholderTextColor={theme.colors.text.muted}
           onFocus={(e) => { setFocused(true); rest.onFocus?.(e); }}
@@ -79,7 +91,7 @@ export const Input = forwardRef<TextInput, Props>(function Input({
             />
           </Pressable>
         ) : null}
-      </View>
+      </Pressable>
 
       {hasError ? (
         <Text style={styles.error}>{error}</Text>
