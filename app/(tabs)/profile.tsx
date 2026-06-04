@@ -13,6 +13,7 @@ import { withPreviewPlaceholders } from '@/lib/preview-profile';
 import { showAlert } from '@/store/alert';
 import { checkUsage, recordUsage } from '@/lib/entitlements';
 import { subscriptionLabel } from '@/lib/access-tier';
+import { TEACHER_MODULE_ENABLED } from '@/domain/feature-flags';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
@@ -21,11 +22,11 @@ export default function ProfileTab() {
   const impersonating = useAuth((s) => s.impersonating);
   const profile       = withPreviewPlaceholders(realProfile, impersonating);
   const signOut          = useAuth((s) => s.signOut);
-  const deactivateAccount = useAuth((s) => s.deactivateAccount);
   const [linkedTeachers, setLinkedTeachers] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!realProfile || impersonating) {
+    // Teacher module disabled → never query / show linked teachers.
+    if (!TEACHER_MODULE_ENABLED || !realProfile || impersonating) {
       setLinkedTeachers([]);
       return;
     }
@@ -99,33 +100,6 @@ export default function ProfileTab() {
     );
   };
 
-  const onDeleteAccount = () => {
-    if (impersonating) return;
-    showAlert(
-      t('auth.deactivate.confirm1Title'),
-      t('auth.deactivate.confirm1Message'),
-      [
-        { text: t('app.cancel'), style: 'cancel' },
-        {
-          text: t('auth.deactivate.confirm1Yes'),
-          style: 'destructive',
-          onPress: () => showAlert(
-            t('auth.deactivate.confirm2Title'),
-            t('auth.deactivate.confirm2Message'),
-            [
-              { text: t('app.cancel'), style: 'cancel' },
-              {
-                text: t('auth.deactivate.confirm2Yes'),
-                style: 'destructive',
-                onPress: () => deactivateAccount().catch((e: any) => showAlert(t('app.error_title'), e?.message ?? String(e))),
-              },
-            ],
-          ),
-        },
-      ],
-    );
-  };
-
   const onSignOut = () => {
     if (impersonating) {
       showAlert(
@@ -179,23 +153,25 @@ export default function ProfileTab() {
         <Text style={styles.cardDesc}>{t('profile.pdfReportDesc')}</Text>
       </Pressable>
 
-      {/* Linked teachers */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>{t('profile.myTeacher')}</Text>
-        {linkedTeachers.length === 0 ? (
-          <Text style={styles.cardDesc}>{t('profile.noTeacher')}</Text>
-        ) : (
-          linkedTeachers.map((t) => (
-            <View key={t.id} style={styles.teacherRow}>
-              <Ionicons name="person-circle-outline" size={28} color={theme.colors.brand.secondaryHover} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.teacherName}>{t.full_name}</Text>
-                {t.school_name ? <Text style={styles.teacherMeta}>{t.school_name}</Text> : null}
+      {/* Linked teachers — only when the teacher module is enabled. */}
+      {TEACHER_MODULE_ENABLED && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{t('profile.myTeacher')}</Text>
+          {linkedTeachers.length === 0 ? (
+            <Text style={styles.cardDesc}>{t('profile.noTeacher')}</Text>
+          ) : (
+            linkedTeachers.map((t) => (
+              <View key={t.id} style={styles.teacherRow}>
+                <Ionicons name="person-circle-outline" size={28} color={theme.colors.brand.secondaryHover} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.teacherName}>{t.full_name}</Text>
+                  {t.school_name ? <Text style={styles.teacherMeta}>{t.school_name}</Text> : null}
+                </View>
               </View>
-            </View>
-          ))
-        )}
-      </View>
+            ))
+          )}
+        </View>
+      )}
 
       <Pressable onPress={() => router.push('/settings/terms')} style={styles.actionRow}>
         <Ionicons name="document-text-outline" size={20} color={theme.colors.text.secondary} />
@@ -207,11 +183,6 @@ export default function ProfileTab() {
         <Ionicons name="key-outline" size={20} color={theme.colors.text.secondary} />
         <Text style={styles.actionText}>{t('auth.deactivate.resetPasswordBtn')}</Text>
         <Ionicons name="chevron-forward" size={16} color={theme.colors.text.muted} />
-      </Pressable>
-
-      <Pressable onPress={onDeleteAccount} style={styles.deleteRow}>
-        <Ionicons name="trash-outline" size={20} color={theme.colors.feedback.errorText} />
-        <Text style={styles.deleteText}>{t('auth.deactivate.deleteAccountBtn')}</Text>
       </Pressable>
 
       <Pressable onPress={onSignOut} style={styles.signOut}>
@@ -257,18 +228,6 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing[2],
   },
   actionText: { ...theme.typography.body, color: theme.colors.text.primary, flex: 1 },
-  deleteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.spacing[2],
-    borderWidth: 1,
-    borderColor: theme.colors.feedback.error + '60',
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing[4],
-    marginBottom: theme.spacing[2],
-  },
-  deleteText: { ...theme.typography.bodyMedium, color: theme.colors.feedback.errorText },
   signOut: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -13,7 +13,8 @@ import { theme } from '@/theme';
 import { t } from '@/i18n';
 
 const STUDENT_FEATURES = () => [
-  t('paywall.studentF1'), t('paywall.studentF2'), t('paywall.studentF3'),
+  // studentF3 (mic pronunciation exercises) removed — the mic service is gone.
+  t('paywall.studentF1'), t('paywall.studentF2'),
   t('paywall.studentF4'), t('paywall.studentF5'), t('paywall.studentF6'),
 ];
 

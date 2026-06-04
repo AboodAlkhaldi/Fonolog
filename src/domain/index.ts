@@ -39,6 +39,7 @@ export {
  */
 export const HIDE_PROMPT_TEXT_MODULES = new Set<string>([
   'ayirtEtme',
+  'harf',
   'hecele',
   'sonHece',
   'uzunKelime',
@@ -53,6 +54,20 @@ export const HIDE_PROMPT_TEXT_MODULES = new Set<string>([
   // via QuestionPrompt — the prompt text is redundant on top of that.
   'tamamla',
   'tamamlaBastan',
+]);
+
+/**
+ * Modules that advance to the next item the instant the student answers — no
+ * "revealed" verdict step, no extra "Devam" tap.
+ *   - ran    → rapid automatic naming: tapping a name jumps straight on, so the
+ *              child keeps a fast naming rhythm.
+ *   - kesfet → explore mode has no scoring; the single "Devam et" button should
+ *              move to the next word directly instead of revealing then asking
+ *              the child to press "Devam" a second time.
+ */
+export const AUTO_ADVANCE_MODULES = new Set<string>([
+  'ran',
+  'kesfet',
 ]);
 
 // ── Repositories ──

@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from '@tanstack/react-query';
 
-import { Screen, Button, ErrorBanner } from '@/components';
+import { Screen, Button, ErrorBanner, Loading } from '@/components';
 import { useAuth }  from '@/store/auth';
 import { useAlert, showAlert } from '@/store/alert';
+import { TEACHER_MODULE_ENABLED } from '@/domain/feature-flags';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
@@ -19,6 +20,17 @@ export default function RoleChoiceScreen() {
     onError: alert.setAlert,
     // Navigation handled by useProtectedRoute on status change.
   });
+
+  // Teacher module disabled → everyone is a student. Skip the choice entirely
+  // and auto-assign the student role; the screen never meaningfully renders.
+  useEffect(() => {
+    if (!TEACHER_MODULE_ENABLED) mutation.mutate('student');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (!TEACHER_MODULE_ENABLED) {
+    return <Screen><Loading /></Screen>;
+  }
 
   const onContinue = () => {
     if (!picked) return;

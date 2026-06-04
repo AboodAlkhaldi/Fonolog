@@ -19,6 +19,7 @@ import { supabase } from '@/lib/supabase';
 import { AppError } from '@/lib/error';
 import { translateAuthError } from '@/lib/auth-errors';
 import { setupDeepLinks } from '@/lib/deep-linking';
+import { TEACHER_MODULE_ENABLED } from '@/domain/feature-flags';
 import { offlineCache } from '@/lib/offline-cache';
 import { showAlert } from '@/store/alert';
 import { useCharacter } from '@/store/character';
@@ -52,7 +53,6 @@ interface AuthState {
   signOut:              () => Promise<void>;
   resendVerification:   () => Promise<void>;
   refreshProfile:       () => Promise<void>;
-  deactivateAccount:    () => Promise<void>;
 
   /** Set role at first time. Cannot be undone (DB trigger enforces). */
   chooseRole:           (role: 'student' | 'teacher') => Promise<void>;
@@ -149,13 +149,21 @@ export const useAuth = create<AuthState>((set, get) => ({
         }
       }
 
-      const derived = deriveStatus(session, profile);
-      set({
-        session,
-        user: session?.user ?? null,
-        profile,
-        status: derived === 'loading' ? 'unauthenticated' : derived,
-      });
+      // Teacher module disabled: a restored teacher-role session is signed out
+      // so the app can't open into the (now hidden) teacher experience. We fall
+      // through to register the deep-link / auth listeners below.
+      if (!TEACHER_MODULE_ENABLED && profile?.role === 'teacher') {
+        await supabase.auth.signOut();
+        set({ status: 'unauthenticated', session: null, user: null, profile: null, impersonating: null });
+      } else {
+        const derived = deriveStatus(session, profile);
+        set({
+          session,
+          user: session?.user ?? null,
+          profile,
+          status: derived === 'loading' ? 'unauthenticated' : derived,
+        });
+      }
     } catch (e) {
       console.error('[auth] initialize failed:', e);
       set({ status: 'unauthenticated', session: null, user: null, profile: null });
@@ -219,28 +227,17 @@ export const useAuth = create<AuthState>((set, get) => ({
           .select('*')
           .eq('id', newSession.user.id)
           .maybeSingle();
-        let p = (data as Profile) ?? null;
+        const p = (data as Profile) ?? null;
 
-        // If a deactivated account just confirmed their email (re-registration),
-        // reactivate it so they continue from where they left off. Also fire
-        // the welcome-back email (separate template from first-time welcome).
-        if (event === 'SIGNED_IN' && p && (p as any).is_active === false) {
-          await supabase
-            .from('profiles')
-            .update({ is_active: true } as any)
-            .eq('id', newSession.user.id);
-          p = { ...p, is_active: true } as any;
-          supabase.functions.invoke('send-welcome-back-email', {
-            body: { user_id: newSession.user.id },
-          }).catch((e) => console.warn('[auth] welcome-back email failed', e));
-        } else if (
+        // First-time verification: fire welcome email (idempotent on the
+        // server side via welcome_email_sent_at stamp). Account deletion /
+        // reactivation no longer exists, so there is no welcome-back path.
+        if (
           event === 'SIGNED_IN' &&
           p &&
           newSession.user.email_confirmed_at &&
           !(p as any).welcome_email_sent_at
         ) {
-          // First-time verification: fire welcome email (idempotent on the
-          // server side via welcome_email_sent_at stamp).
           supabase.functions.invoke('send-welcome-email', {
             body: { user_id: newSession.user.id },
           }).catch((e) => console.warn('[auth] welcome email failed', e));
@@ -334,10 +331,11 @@ export const useAuth = create<AuthState>((set, get) => ({
         profile = (row as Profile) ?? null;
       }
 
-      // Block deactivated accounts from signing in with password.
-      if (profile && (profile as any).is_active === false) {
+      // Teacher module disabled: teacher-role accounts may no longer sign in.
+      // (Existing teachers should be re-roled to student; this guards any miss.)
+      if (!TEACHER_MODULE_ENABLED && profile?.role === 'teacher') {
         await supabase.auth.signOut();
-        throw new AppError('Bu hesap devre dışı bırakıldı. Yeniden kayıt olarak hesabınızı geri yükleyebilirsiniz.');
+        throw new AppError('Bu hesap türü artık desteklenmiyor.');
       }
 
       if (profile) offlineCache.setProfile(profile);
@@ -352,24 +350,6 @@ export const useAuth = create<AuthState>((set, get) => ({
     } finally {
       explicitAuthInFlight = false;
     }
-  },
-
-  deactivateAccount: async () => {
-    const { user } = get();
-    if (!user) throw new AppError('Oturum bulunamadı.');
-    const { error } = await supabase.rpc('deactivate_account' as any);
-    if (error) throw new AppError(error.message);
-    // Fire the goodbye email + admin emails. We do this BEFORE signOut so the
-    // user's session is still attached when the edge function authenticates.
-    try {
-      await supabase.functions.invoke('send-account-removed-email', {
-        body: { user_id: user.id },
-      });
-    } catch (e) {
-      console.warn('[auth] goodbye email failed', e);
-    }
-    await supabase.auth.signOut();
-    set({ status: 'unauthenticated', session: null, user: null, profile: null, impersonating: null });
   },
 
   signOut: async () => {

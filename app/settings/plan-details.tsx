@@ -156,8 +156,8 @@ export default function PlanDetails() {
         <View style={styles.featuresCard}>
           <Feature icon="game-controller-outline" text={t('planDetails.proF1')} />
           <Feature icon="document-text-outline"   text={t('planDetails.proF2')} />
-          <Feature icon="people-outline"          text={t('planDetails.proF3')} />
-          <Feature icon="mic-outline"             text={t('planDetails.proF4')} />
+          {/* proF3 (teacher öğrenci/ödev) and proF4 (mic pronunciation) removed:
+              the teacher module is disabled and the mic service is gone. */}
           <Feature icon="flame-outline"           text={t('planDetails.proF5')} />
         </View>
 
