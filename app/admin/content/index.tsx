@@ -33,6 +33,13 @@ export default function AdminContent() {
         desc={t('admin.content.charactersDesc')}
         onPress={() => router.push('/admin/content/characters')}
       />
+
+      <Section
+        icon="pricetag-outline"
+        title={t('admin.content.coupons')}
+        desc={t('admin.content.couponsDesc')}
+        onPress={() => router.push('/admin/content/coupons' as any)}
+      />
     </Screen>
   );
 }
