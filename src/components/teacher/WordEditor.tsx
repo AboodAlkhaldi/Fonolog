@@ -17,6 +17,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 
 import { Screen, Button, Input, Loading, WordImage } from '@/components';
+import { SpeakerButton } from '@/components/session/SpeakerButton';
 import { supabase } from '@/lib/supabase';
 import { contentRepository, type Category } from '@/domain';
 import { showAlert } from '@/store/alert';
@@ -33,7 +34,7 @@ function looksLikeSvg(text: string): boolean {
   return t.includes('<svg') && t.includes('</svg>');
 }
 
-function autoSyllabify(word: string): string[] {
+function syllabifyWord(word: string): string[] {
   const VOWELS = new Set('aeıioöuüAEIİOÖUÜ');
   const out: string[] = [];
   let buf = '';
@@ -50,6 +51,30 @@ function autoSyllabify(word: string): string[] {
   }
   if (buf) out.push(buf);
   return out.length > 0 ? out : [word];
+}
+
+/**
+ * Syllabify a (possibly multi-word) phrase. Each space-separated word is
+ * syllabified independently; the words are rejoined with a space so the auto
+ * output reads e.g. "mik-ro-dal-ga fı-rın". The space is a syllable boundary
+ * just like '-', so the count stays correct for two-word phrases.
+ */
+function autoSyllabify(text: string): string {
+  return text
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => syllabifyWord(w).join('-'))
+    .join(' ');
+}
+
+/**
+ * Split a syllable string into individual syllables. Both '-' and whitespace
+ * are syllable separators: a phrase like "mik-ro-dal-ga fı-rın" must count the
+ * space between the two words too, otherwise "ga fı" collapses into one hece.
+ */
+function splitSyllables(text: string): string[] {
+  return text.split(/[-\s]+/).map((s) => s.trim()).filter(Boolean);
 }
 
 function decode(base64: string): Uint8Array {
@@ -69,12 +94,20 @@ export default function WordEditor() {
   const [cats, setCats] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState('');
   const [wordText, setWordText] = useState('');
+  // The word_text as it was when the editor opened — used on save to detect
+  // whether the spoken text changed and the TTS audio must be regenerated.
+  const [originalWordText, setOriginalWordText] = useState('');
   const [syllables, setSyllables] = useState('');
 
   // Image asset state. `pickedUri` is a local file picked in this session and
   // not yet uploaded; `currentImageUrl` is the URL already stored on the row.
   const [pickedUri, setPickedUri] = useState<string | null>(null);
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
+
+  // Current TTS audio URL stored on the row, so the admin can listen to / regen
+  // the existing sound.
+  const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -88,16 +121,48 @@ export default function WordEditor() {
         const { data } = await supabase.from('words').select('*').eq('id', id).maybeSingle();
         if (data) {
           setWordText(data.word_text);
+          setOriginalWordText(data.word_text);
           setSyllables((data.syllables ?? []).join('-'));
           setCategoryId(data.category_id);
           if (data.image_url) setCurrentImageUrl(data.image_url);
+          if (data.audio_url) setCurrentAudioUrl(data.audio_url);
         }
       }
       setLoading(false);
     })();
   }, [id]);
 
-  const onAuto = () => setSyllables(autoSyllabify(wordText).join('-'));
+  const onAuto = () => setSyllables(autoSyllabify(wordText));
+
+  // Manually force-regenerate the TTS audio for the saved word. Unlike the
+  // automatic regen on save, this awaits the result so we can swap in the new
+  // (cache-busted) URL and let the admin listen immediately. It regenerates
+  // from the word's CURRENTLY SAVED text — mainly to fix older words whose
+  // audio went stale before force-regeneration existed.
+  const onRegenerate = async () => {
+    if (isNew || !id) return;
+    setRegenerating(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-tts`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word_id: id, force: true }),
+      });
+      if (!res.ok) {
+        showAlert(t('app.error_title'), `${t('teacher.wordEdit.regenFailed')} ${await res.text()}`);
+        return;
+      }
+      const json = await res.json();
+      if (json.audio_url) setCurrentAudioUrl(json.audio_url);
+      contentRepository.invalidate();
+      showAlert(t('app.ok'), t('teacher.wordEdit.regenSuccess'));
+    } catch (e) {
+      showAlert(t('app.error_title'), `${t('teacher.wordEdit.regenFailed')} ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setRegenerating(false);
+    }
+  };
 
   const pickImage = async () => {
     // SVG-only. expo-image-picker does not pick SVGs reliably across
@@ -154,7 +219,7 @@ export default function WordEditor() {
       return;
     }
     setSubmitting(true);
-    const syl = syllables.split('-').map((s) => s.trim()).filter(Boolean);
+    const syl = splitSyllables(syllables);
     const wl = wordText.toLowerCase().trim();
 
     // Insert the row first so we have a stable id for the image path; then
@@ -217,13 +282,22 @@ export default function WordEditor() {
       }
     }
 
-    // Kick off TTS generation (fire-and-forget — same as before)
-    const { data: { session } } = await supabase.auth.getSession();
-    fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-tts`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ word_id: resultId }),
-    }).catch(() => {});
+    // Kick off TTS generation (fire-and-forget). Only (re)generate when needed:
+    //   - new word        → no audio yet, generate it
+    //   - edited word_text → the spoken word changed, force a regen (overwrites
+    //                        the old mp3 in place). The hece does NOT affect the
+    //                        spoken audio, so a hece-only edit is skipped.
+    // Skipping unchanged saves avoids re-charging Google TTS for image/category
+    // edits.
+    const textChanged = !isNew && wl !== originalWordText;
+    if (isNew || textChanged) {
+      const { data: { session } } = await supabase.auth.getSession();
+      fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-tts`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word_id: resultId, force: textChanged }),
+      }).catch(() => {});
+    }
 
     contentRepository.invalidate();
     router.back();
@@ -282,6 +356,29 @@ export default function WordEditor() {
                   style={{ marginBottom: 16 }} />
         </View>
 
+        {/* Audio — listen to the current sound + force-regenerate it. Only for
+            saved words (a brand-new word has no audio / id yet). */}
+        {!isNew && (
+          <View style={{ marginTop: theme.spacing[4] }}>
+            <Text style={styles.label}>{t('teacher.wordEdit.audioLabel')}</Text>
+            <View style={styles.audioRow}>
+              {currentAudioUrl ? (
+                <SpeakerButton audioUrl={currentAudioUrl} size={48} />
+              ) : (
+                <Text style={styles.audioMissing}>{t('teacher.wordEdit.audioMissing')}</Text>
+              )}
+              <Button
+                label={regenerating ? t('teacher.wordEdit.regenerating') : t('teacher.wordEdit.regenerateBtn')}
+                variant="secondary"
+                size="md"
+                loading={regenerating}
+                onPress={onRegenerate}
+                style={{ flex: 1, marginLeft: theme.spacing[3] }}
+              />
+            </View>
+          </View>
+        )}
+
         <Text style={styles.label}>{t('teacher.wordEdit.categoryLabel')}</Text>
         <View style={styles.catGrid}>
           {cats.map((c) => (
@@ -331,6 +428,8 @@ const styles = StyleSheet.create({
     color: theme.colors.text.muted,
     marginBottom: theme.spacing[3],
   },
+  audioRow: { flexDirection: 'row', alignItems: 'center' },
+  audioMissing: { ...theme.typography.bodySmall, color: theme.colors.text.muted },
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[2], marginBottom: theme.spacing[3] },
   catTile: {
     paddingHorizontal: theme.spacing[3], paddingVertical: theme.spacing[2],
