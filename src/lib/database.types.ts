@@ -10,7 +10,7 @@
 
 // ─── Enums ───────────────────────────────────────────────
 export type UserRole           = 'student' | 'teacher' | 'admin';
-export type SubscriptionStatus = 'free' | 'trial' | 'active' | 'student' | 'expert';
+export type SubscriptionStatus = 'free' | 'trial' | 'active' | 'student' | 'expert' | 'coupon';
 export type HomeworkStatus     = 'assigned' | 'completed' | 'overdue';
 export type MilestoneStatus    = 'pending' | 'in_progress' | 'completed' | 'skipped';
 export type ItemRarity         = 'common' | 'rare' | 'legendary';
@@ -200,6 +200,28 @@ export interface TeacherNoteRow {
   updated_at:        string;
 }
 
+export interface CouponRow {
+  id:               string;
+  code:             string;   // case-sensitive promo code
+  free_days:        number;   // Pro days granted on redemption (default 30)
+  max_redemptions:  number;   // total redemptions allowed across all users
+  redeemed_count:   number;   // atomic counter, maintained by redeem_coupon()
+  is_active:        boolean;  // admin on/off switch
+  created_by:       string | null;
+  created_at:       string;
+  updated_at:       string;
+}
+
+export interface CouponRedemptionRow {
+  id:          string;
+  coupon_id:   string;
+  user_id:     string;
+  redeemed_at: string;
+}
+
+/** Derived coupon state shown in the admin panel. */
+export type CouponState = 'valid' | 'used_up' | 'inactive';
+
 // ─── Top-level Database type (Supabase client generic) ───
 //
 // Each table needs: Row, Insert, Update, Relationships.
@@ -226,6 +248,8 @@ export interface Database {
       homeworks:               { Row: HomeworkRow;               Insert: Partial<HomeworkRow>;               Update: Partial<HomeworkRow>;               Relationships: [] };
       notifications:           { Row: NotificationRow;           Insert: Partial<NotificationRow>;           Update: Partial<NotificationRow>;           Relationships: [] };
       teacher_notes:           { Row: TeacherNoteRow;            Insert: Partial<TeacherNoteRow>;            Update: Partial<TeacherNoteRow>;            Relationships: [] };
+      coupons:                 { Row: CouponRow;                 Insert: Partial<CouponRow>;                 Update: Partial<CouponRow>;                 Relationships: [] };
+      coupon_redemptions:      { Row: CouponRedemptionRow;       Insert: Partial<CouponRedemptionRow>;       Update: Partial<CouponRedemptionRow>;       Relationships: [] };
     };
     Views:     Record<string, never>;
     Functions: {
@@ -248,6 +272,10 @@ export interface Database {
       equip_item: {
         Args:    { p_item_id: string };
         Returns: void;
+      };
+      redeem_coupon: {
+        Args:    { p_user_id: string; p_code: string };
+        Returns: { status: string; free_days: number | null; expires_at: string | null };
       };
     };
     Enums:     { [_ in never]: never };

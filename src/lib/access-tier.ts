@@ -33,7 +33,10 @@ export function getAccessTier(profile: Profile | null | undefined): AccessTier {
 
   const sub = profile.subscription_status;
 
-  if (sub === 'active' || sub === 'student' || sub === 'expert') return 'subscribed';
+  // 'coupon' is the promo-code Pro tier: functionally identical to a paid
+  // subscription (full Pro access), only the duration (30d) and the
+  // acquisition path differ. It MUST map to 'subscribed' like the paid tiers.
+  if (sub === 'active' || sub === 'student' || sub === 'expert' || sub === 'coupon') return 'subscribed';
 
   if (sub === 'trial') {
     const expires = profile.subscription_expires
@@ -84,6 +87,7 @@ export function subscriptionLabel(status: string | null | undefined): string {
     active:  'Pro Aktif',   // legacy — superseded by student/expert
     student: 'Öğrenci Pro',
     expert:  'Uzman Pro',
+    coupon:  'Promosyon Pro',   // promo-code Pro (30 days) — full Pro access
     free:    'Ücretsiz',
   };
   return map[status ?? ''] ?? (status ?? 'Ücretsiz');

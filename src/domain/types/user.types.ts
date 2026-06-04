@@ -58,6 +58,13 @@ export const SUBSCRIPTION_ENTITLEMENTS: Record<SubscriptionStatus, EntitlementKe
     'milestone_tests', 'tts_all_words', 'microphone', 'full_character',
     'unlimited_history', 'unlimited_pdf',
   ],
+  // 'coupon' = promo-code Pro: identical full student-grade entitlements, just a
+  // shorter (30-day) window. Mirrors `student` exactly.
+  coupon: [
+    'all_categories', 'all_modules', 'learn_mode', 'revision_mode',
+    'milestone_tests', 'tts_all_words', 'microphone', 'full_character',
+    'unlimited_history', 'unlimited_pdf',
+  ],
   expert: [
     'all_categories', 'all_modules', 'learn_mode', 'revision_mode',
     'milestone_tests', 'tts_all_words', 'microphone', 'full_character',
