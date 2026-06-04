@@ -12,7 +12,6 @@ import { t } from '@/i18n';
 export default function AdminSettings() {
   const profile           = useAuth((s) => s.profile);
   const signOut           = useAuth((s) => s.signOut);
-  const deactivateAccount = useAuth((s) => s.deactivateAccount);
   const impersonating     = useAuth((s) => s.impersonating);
 
   if (!profile) return null;
@@ -25,33 +24,6 @@ export default function AdminSettings() {
       [
         { text: t('app.cancel'), style: 'cancel' },
         { text: t('settings.continueBtn'), onPress: () => router.push('/reset-password') },
-      ],
-    );
-  };
-
-  const onDeleteAccount = () => {
-    if (impersonating) return;
-    showAlert(
-      t('auth.deactivate.confirm1Title'),
-      t('auth.deactivate.confirm1Message'),
-      [
-        { text: t('app.cancel'), style: 'cancel' },
-        {
-          text: t('auth.deactivate.confirm1Yes'),
-          style: 'destructive',
-          onPress: () => showAlert(
-            t('auth.deactivate.confirm2Title'),
-            t('auth.deactivate.confirm2Message'),
-            [
-              { text: t('app.cancel'), style: 'cancel' },
-              {
-                text: t('auth.deactivate.confirm2Yes'),
-                style: 'destructive',
-                onPress: () => deactivateAccount().catch((e: any) => showAlert(t('app.error_title'), e?.message ?? String(e))),
-              },
-            ],
-          ),
-        },
       ],
     );
   };
@@ -95,11 +67,6 @@ export default function AdminSettings() {
         <Ionicons name="chevron-forward" size={16} color={theme.colors.text.muted} />
       </Pressable>
 
-      <Pressable onPress={onDeleteAccount} style={styles.deleteRow}>
-        <Ionicons name="trash-outline" size={20} color={theme.colors.feedback.errorText} />
-        <Text style={styles.deleteText}>{t('auth.deactivate.deleteAccountBtn')}</Text>
-      </Pressable>
-
       <Pressable onPress={onSignOut} style={styles.signOut}>
         <Ionicons name="log-out-outline" size={20} color={theme.colors.feedback.errorText} />
         <Text style={styles.signOutText}>{t('settings.signOutTitle')}</Text>
@@ -127,18 +94,6 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing[2],
   },
   actionText: { ...theme.typography.body, color: theme.colors.text.primary, flex: 1 },
-  deleteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.spacing[2],
-    borderWidth: 1,
-    borderColor: theme.colors.feedback.error + '60',
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing[4],
-    marginBottom: theme.spacing[2],
-  },
-  deleteText: { ...theme.typography.bodyMedium, color: theme.colors.feedback.errorText },
   signOut: {
     flexDirection: 'row',
     alignItems: 'center',

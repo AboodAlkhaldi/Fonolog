@@ -148,14 +148,9 @@ const tr = {
       expiredAlert:    'Şifre sıfırlama bağlantısının süresi dolmuş veya daha önce kullanılmış. Lütfen yeni bir bağlantı talep et.',
     },
     deactivate: {
+      // Account deletion has been removed; only the password-reset entry point
+      // remains here (still used by the profile / settings screens).
       resetPasswordBtn:  'Şifremi Sıfırla',
-      deleteAccountBtn:  'Hesabı Sil',
-      confirm1Title:     'Hesabı Sil?',
-      confirm1Message:   'Hesabınızı silmek istediğinizden emin misiniz? Tüm ilerlemeniz korunacak; aynı e-posta ile yeniden kayıt olarak geri dönebilirsiniz.',
-      confirm1Yes:       'Evet, devam et',
-      confirm2Title:     'Son Onay',
-      confirm2Message:   'Hesabınız devre dışı bırakılacak. Bu işlemi onaylıyor musunuz?',
-      confirm2Yes:       'Evet, hesabımı sil',
     },
   },
 
@@ -362,6 +357,7 @@ const tr = {
       newSuffix:      'Ekle',
       editSuffix:     'Düzenle',
       newWordBtn:     '+ Yeni Kelime',
+      noWordsInCategory: 'Bu kategoride henüz kelime yok.',
       newCategoryBtn: '+ Yeni Kategori',
       newCharacterBtn:'+ Yeni Karakter',
       addTitle:       'Ne ekleyeceksin?',
@@ -504,6 +500,13 @@ const tr = {
       addBtn:          'Ekle',
       saveBtn:         'Kaydet',
       incompleteMsg:   'Tüm alanları doldur.',
+      audioLabel:      'Ses',
+      audioMissing:    'Bu kelimenin henüz sesi yok.',
+      listenBtn:       'Dinle',
+      regenerateBtn:   'Sesi yeniden oluştur',
+      regenerating:    'Ses oluşturuluyor...',
+      regenSuccess:    'Ses yeniden oluşturuldu.',
+      regenFailed:     'Ses oluşturulamadı.',
     },
     studentCount:   '{{count}} öğrenci',
     noStudents:     'Henüz öğrencin yok',
