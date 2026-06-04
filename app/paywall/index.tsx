@@ -12,15 +12,16 @@ import { SUPPORT_EMAIL, supportMailto } from '@/lib/contact';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
+/** True for an annual RC package (the only plan we sell now). */
+function isYearly(pkg: any): boolean {
+  const id = `${pkg?.product?.identifier ?? ''} ${pkg?.identifier ?? ''}`.toLowerCase();
+  return pkg?.packageType === 'ANNUAL' || id.includes('year') || id.includes('annual') || id.includes('yearly');
+}
+
 const STUDENT_FEATURES = () => [
   // studentF3 (mic pronunciation exercises) removed — the mic service is gone.
   t('paywall.studentF1'), t('paywall.studentF2'),
   t('paywall.studentF4'), t('paywall.studentF5'), t('paywall.studentF6'),
-];
-
-const TEACHER_FEATURES = () => [
-  t('paywall.teacherF1'), t('paywall.teacherF2'), t('paywall.teacherF3'),
-  t('paywall.teacherF4'), t('paywall.teacherF5'), t('paywall.teacherF6'),
 ];
 
 export default function PaywallScreen() {
@@ -31,26 +32,33 @@ export default function PaywallScreen() {
   const [unavailable, setUnavailable] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const isTeacher = profile?.role === 'teacher';
-  const features = isTeacher ? TEACHER_FEATURES() : STUDENT_FEATURES();
+  // Teacher subscriptions are disabled — only the student yearly plan is sold.
+  // `home` is still role-aware so a teacher who somehow lands here is routed
+  // back to their own area, but the paywall content is student-only.
+  const home = profile?.role === 'teacher' ? '/teacher' : '/(tabs)';
+  const features = STUDENT_FEATURES();
   const tier = getAccessTier(profile);
   const isPro = tier === 'subscribed';
 
   // If already subscribed, bounce out — don't show the paywall.
   useEffect(() => {
     if (isPro) {
-      router.replace(profile?.role === 'teacher' ? '/teacher' : '/(tabs)');
+      router.replace(home);
     }
-  }, [isPro, profile?.role]);
+  }, [isPro, home]);
 
   useEffect(() => {
     (async () => {
       try {
-        const pkgs = await getOfferings(profile?.role === 'teacher' ? 'teacher' : 'student');
-        if (pkgs.length === 0) {
+        // Student offering only. Defensively keep just the yearly package in
+        // case a legacy monthly product is still attached to the offering in RC.
+        const pkgs = await getOfferings('student');
+        const yearly = pkgs.filter(isYearly);
+        const usable = yearly.length > 0 ? yearly : pkgs;
+        if (usable.length === 0) {
           setUnavailable(true);
         } else {
-          setPackages(pkgs);
+          setPackages(usable);
         }
       } catch (e) {
         console.warn('[paywall] offerings', e);
@@ -67,7 +75,7 @@ export default function PaywallScreen() {
       await purchasePackage(pkg);
       await refreshProfile();
       showAlert(t('paywall.successTitle'), t('paywall.successMsg'), [
-        { text: t('app.ok'), onPress: () => router.replace(isTeacher ? '/teacher' : '/(tabs)') },
+        { text: t('app.ok'), onPress: () => router.replace(home) },
       ]);
     } catch (e: any) {
       if (!e?.userCancelled) showAlert(t('app.error_title'), e?.message ?? t('paywall.purchaseFail'));
@@ -99,9 +107,9 @@ export default function PaywallScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.emoji}>⭐</Text>
-        <Text style={styles.title}>{isTeacher ? t('paywall.titleTeacher') : t('paywall.titleStudent')}</Text>
+        <Text style={styles.title}>{t('paywall.titleStudent')}</Text>
         <Text style={styles.subtitle}>
-          {isTeacher ? t('paywall.subtitleTeacher') : t('paywall.subtitleStudent')}
+          {t('paywall.subtitleStudent')}
         </Text>
 
         <View style={styles.features}>
