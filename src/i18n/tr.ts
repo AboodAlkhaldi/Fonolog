@@ -348,6 +348,8 @@ const tr = {
       categoriesDesc: 'Kelime kategorilerini yönet.',
       characters:     'Karakterler',
       charactersDesc: 'Ana karakterler, kategoriler ve aksesuarları yönet.',
+      coupons:        'Promosyon Kodları',
+      couponsDesc:    'Promosyon kodları oluştur, düzenle ve durumlarını gör.',
       deleteTitle:    'Sil',
       deleteConfirm:  '"{{name}}" öğesini silmek istediğine emin misin?',
       editBtn:        'Düzenle',
@@ -653,6 +655,38 @@ const tr = {
     supportTitle:   'Destek',
     supportContact: 'Bize yaz',
     adminLabel:     'Yönetici',
+  },
+
+  // ─── Coupons (promosyon kodu) ──────────────────────
+  coupon: {
+    // Student-facing (plan section)
+    sectionTitle:   'Promosyon Kodu',
+    sectionDesc:    'Bir promosyon kodun varsa buraya gir ve 1 ay ücretsiz Pro kazan.',
+    inputPlaceholder: 'Promosyon kodunu yaz',
+    redeemBtn:      'Kodu Kullan',
+    successTitle:   'Tebrikler! 🎉',
+    successMsg:     'Promosyon kodun kullanıldı. {{date}} tarihine kadar Pro avantajların aktif!',
+    // Status messages
+    errInvalid:     'Bu kod geçerli değil. Lütfen kontrol edip tekrar dene.',
+    errUsedUp:      'Bu kodun kullanım hakkı dolmuş.',
+    errAlreadyRedeemed: 'Bu kodu daha önce kullandın. Her kod kişi başı bir kez kullanılabilir.',
+    errAlreadyPro:  'Zaten Pro üyeliğin var. Bu yüzden şu an kod kullanamazsın.',
+    errGeneric:     'Kod kullanılamadı. Lütfen daha sonra tekrar dene.',
+    // Admin-facing
+    adminTitle:     'Promosyon Kodları',
+    newBtn:         '+ Yeni Kod',
+    editTitle:      'Kodu Düzenle',
+    newTitle:       'Yeni Promosyon Kodu',
+    codeLabel:      'Kod (büyük/küçük harf duyarlı)',
+    freeDaysLabel:  'Ücretsiz gün sayısı',
+    maxRedemptionsLabel: 'Maksimum kullanım sayısı',
+    activeLabel:    'Aktif',
+    usageLabel:     '{{used}} / {{max}} kullanıldı',
+    stateValid:     'Geçerli',
+    stateUsedUp:    'Doldu',
+    stateInactive:  'Pasif',
+    codeRequired:   'Kod alanı zorunlu.',
+    deleteConfirm:  '"{{code}}" kodunu silmek istediğine emin misin?',
   },
 
   // ─── Session result ────────────────────────────────
