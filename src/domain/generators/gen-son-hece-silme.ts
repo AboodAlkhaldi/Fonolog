@@ -8,7 +8,13 @@ import { shuffle, qid } from './utils'
 export function genSonHeceSilme(words: Word[], opts?: { targets?: Word[] }): Question[] {
   const primary = (opts?.targets ?? words).filter(w => w.n >= 2)
   return shuffle(primary).slice(0, 20).map((word, i) => {
-    const remaining = word.syl.slice(0, -1).join('')
+    // Derive the remainder from the original word text (NOT syl.join('')) so the
+    // space in a multi-word phrase survives: "yürüyen merdiven" → "yürüyen
+    // merdi", not "yürüyenmerdi". The last syllable is anchored at the end, so
+    // stripping its char-length from the back is exact; trim cleans up a
+    // trailing space if the last word was single-syllable.
+    const lastSyl   = word.syl[word.syl.length - 1] ?? ''
+    const remaining = word.word.slice(0, word.word.length - lastSyl.length).trim()
     return {
       id:      qid('shs', i),
       word,
