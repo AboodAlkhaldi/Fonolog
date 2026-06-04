@@ -83,7 +83,7 @@ export function BuilderQuestion({ question, status, chosen, onChoose }: Props) {
 
       {/* Assembly area */}
       <View style={styles.assemblyRow}>
-        <Text style={[styles.assembly, { color: assemblyColor }]}>
+        <Text style={[styles.assembly, { color: assemblyColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
           {assembled || '\u00A0'}
         </Text>
         {!revealed && picked.length > 0 ? (

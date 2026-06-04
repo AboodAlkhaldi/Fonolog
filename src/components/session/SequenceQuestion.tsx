@@ -245,7 +245,7 @@ export function SequenceQuestion({ question }: Props) {
             {current && showItem ? (
               <>
                 <WordImage word={current} size={120} />
-                <Text style={styles.flashWord}>{current.word}</Text>
+                <Text style={styles.flashWord} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{current.word}</Text>
               </>
             ) : (
               <Text style={styles.flashDots}>•••</Text>

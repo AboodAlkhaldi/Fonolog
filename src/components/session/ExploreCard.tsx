@@ -29,14 +29,15 @@ export function ExploreCard({ question, status, onChoose }: Props) {
         <WordImage word={question.word} size={140} />
       </View>
 
-      {/* Syllable blocks */}
+      {/* Syllable blocks — wrap to multiple rows so a long (or multi-word)
+          word never runs off the screen edge. */}
       <View style={styles.syllableRow}>
         {syllables.map((syl, i) => (
           <View
             key={i}
             style={[styles.sylBlock, { backgroundColor: SYLLABLE_COLORS[i % SYLLABLE_COLORS.length] }]}
           >
-            <Text style={styles.sylText}>{syl}</Text>
+            <Text style={styles.sylText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{syl}</Text>
           </View>
         ))}
       </View>
@@ -86,14 +87,18 @@ const styles = StyleSheet.create({
   },
   syllableRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: theme.spacing[2],
     marginBottom: theme.spacing[4],
+    paddingHorizontal: theme.spacing[2],
   },
   sylBlock: {
     borderRadius: theme.radius.md,
     paddingHorizontal: theme.spacing[4],
     paddingVertical: theme.spacing[2],
+    maxWidth: '90%',
   },
   sylText: {
     ...theme.typography.h2,

@@ -94,7 +94,7 @@ export function MultipleChoiceQuestion({
               accessibilityState={{ selected: isChosen, disabled: revealed }}
               style={[styles.tile, { backgroundColor: bg, borderColor: bd }]}
             >
-              <Text style={styles.tileText}>{opt}</Text>
+              <Text style={styles.tileText} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.6}>{opt}</Text>
               {icon ? (
                 <View style={styles.tileIcon}>
                   <Ionicons
