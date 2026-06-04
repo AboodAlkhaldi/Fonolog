@@ -59,7 +59,10 @@ export default function AdminCategories() {
         data={cats}
         keyExtractor={(c) => c.id}
         renderItem={({ item }) => (
-          <View style={styles.row}>
+          <Pressable
+            style={styles.row}
+            onPress={() => router.push(`/admin/content/category-words/${item.id}?name=${encodeURIComponent(item.name)}` as any)}
+          >
             <Text style={styles.emoji}>{item.emoji}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{item.name}</Text>
@@ -68,7 +71,7 @@ export default function AdminCategories() {
             <Pressable onPress={() => showActions(item)} hitSlop={12} style={styles.dotsBtn}>
               <Ionicons name="ellipsis-vertical" size={20} color={theme.colors.text.muted} />
             </Pressable>
-          </View>
+          </Pressable>
         )}
       />
     </Screen>

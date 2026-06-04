@@ -17,7 +17,6 @@ export default function CategoryEditor() {
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('');
   const [description, setDescription] = useState('');
-  const [level, setLevel] = useState('0');
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -29,7 +28,6 @@ export default function CategoryEditor() {
           setName(data.name);
           setEmoji(data.emoji ?? '');
           setDescription(data.description ?? '');
-          setLevel(String(data.level ?? 0));
         }
       }
       setLoading(false);
@@ -44,7 +42,6 @@ export default function CategoryEditor() {
       name,
       emoji: emoji || '📁',
       description,
-      level: parseInt(level, 10) || 0,
       is_active: true,
     };
 
@@ -70,8 +67,6 @@ export default function CategoryEditor() {
         <Input label={t('admin.content.nameLabel')} value={name} onChangeText={setName} required />
         <Input label={t('admin.content.emojiLabel')} value={emoji} onChangeText={setEmoji} placeholder="ör: 🐱" />
         <Input label={t('admin.content.descOptLabel')} value={description} onChangeText={setDescription} multiline />
-        <Input label={t('admin.content.levelLabel')} value={level} onChangeText={setLevel}
-               keyboardType="numeric" />
 
         <Button
           label={isNew ? t('admin.content.newSuffix') : t('app.save')}

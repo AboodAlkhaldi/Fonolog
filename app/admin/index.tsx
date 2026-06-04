@@ -64,7 +64,7 @@ export default function AdminDashboard() {
             {renderSectionHeader(t('admin.students'), students.length)}
             {students.slice(0, 5).map((u) => <UserCard key={u.id} user={u} />)}
             {students.length > 5 && (
-              <Pressable style={styles.seeAll} onPress={() => router.push('/admin/users-list?role=student')}>
+              <Pressable style={styles.seeAll} onPress={() => router.push('/admin/users-list?role=student' as any)}>
                 <Text style={styles.seeAllText}>{t('admin.seeAll')}</Text>
               </Pressable>
             )}
@@ -74,7 +74,7 @@ export default function AdminDashboard() {
             {renderSectionHeader(t('admin.teachers'), teachers.length)}
             {teachers.slice(0, 5).map((u) => <UserCard key={u.id} user={u} />)}
             {teachers.length > 5 && (
-              <Pressable style={styles.seeAll} onPress={() => router.push('/admin/users-list?role=teacher')}>
+              <Pressable style={styles.seeAll} onPress={() => router.push('/admin/users-list?role=teacher' as any)}>
                 <Text style={styles.seeAllText}>{t('admin.seeAll')}</Text>
               </Pressable>
             )}

@@ -1,9 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
-import { useFocusEffect, router } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Screen, Loading, Button, Input, WordImage } from '@/components';
+import { Screen, Loading, Button, WordImage } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { contentRepository } from '@/domain';
 import type { Word } from '@/domain';
@@ -14,25 +14,35 @@ import { t } from '@/i18n';
 interface WordRow {
   id: string;
   word_text: string;
-  emoji: string;
   audio_url: string | null;
   category_id: string;
   image_url: string | null;
   image_type: 'svg' | 'png' | null;
 }
 
-export default function AdminWords() {
+/**
+ * Words of a single category — opened by tapping a category card in
+ * /admin/content/categories. Mirrors the row + 3-dots edit/delete actions of
+ * the full words list (app/admin/content/words.tsx) so an admin can manage a
+ * category's words in place.
+ */
+export default function AdminCategoryWords() {
+  const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const [words, setWords] = useState<WordRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
 
   const load = async () => {
-    const { data } = await supabase.from('words').select('id,word_text,audio_url,category_id,image_url,image_type').eq('is_active', true).order('word_text');
+    const { data } = await supabase
+      .from('words')
+      .select('id,word_text,audio_url,category_id,image_url,image_type')
+      .eq('is_active', true)
+      .eq('category_id', id)
+      .order('word_text');
     setWords((data ?? []) as WordRow[]);
     setLoading(false);
   };
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+  useFocusEffect(useCallback(() => { load(); }, [id]));
 
   const onDelete = (w: WordRow) => showAlert(t('admin.content.deleteTitle'), t('admin.content.deleteConfirm', { name: w.word_text }), [
     { text: t('app.cancel'), style: 'cancel' },
@@ -52,10 +62,6 @@ export default function AdminWords() {
     { text: t('app.cancel'), style: 'cancel' },
   ]);
 
-  const filtered = search
-    ? words.filter((w) => w.word_text.toLowerCase().includes(search.toLowerCase()))
-    : words;
-
   if (loading) return <Screen><Loading /></Screen>;
 
   return (
@@ -64,7 +70,7 @@ export default function AdminWords() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
           <Ionicons name="chevron-back" size={28} color={theme.colors.text.primary} />
         </Pressable>
-        <Text style={styles.title}>{t('admin.content.words')} ({words.length})</Text>
+        <Text style={styles.title} numberOfLines={1}>{name ?? t('admin.content.words')} ({words.length})</Text>
       </View>
 
       <Button
@@ -73,16 +79,9 @@ export default function AdminWords() {
         onPress={() => router.push('/admin/content/word/new')}
       />
 
-      <Input
-        value={search}
-        onChangeText={setSearch}
-        placeholder={t('app.searchPh')}
-        containerStyle={{ marginTop: theme.spacing[2] }}
-      />
-
       <FlatList
-        style={{ marginTop: theme.spacing[2] }}
-        data={filtered}
+        style={{ marginTop: theme.spacing[3] }}
+        data={words}
         keyExtractor={(w) => w.id}
         renderItem={({ item }) => (
           <Pressable style={styles.row} onPress={() => router.push(`/admin/content/word/${item.id}`)}>
@@ -107,6 +106,7 @@ export default function AdminWords() {
             </Pressable>
           </Pressable>
         )}
+        ListEmptyComponent={<Text style={styles.empty}>{t('admin.content.noWordsInCategory')}</Text>}
       />
     </Screen>
   );
@@ -130,4 +130,5 @@ const styles = StyleSheet.create({
   },
   wordText: { ...theme.typography.body, color: theme.colors.text.primary, flex: 1 },
   dotsBtn: { padding: theme.spacing[1] },
+  empty: { ...theme.typography.body, color: theme.colors.text.muted, textAlign: 'center', marginTop: theme.spacing[6] },
 });
