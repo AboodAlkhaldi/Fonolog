@@ -67,6 +67,7 @@ export function AudioPairQuestion({ question, status, chosen, onChoose, hideProm
           onPress={() => onPress(wordA.word)}
           syllableCount={wordA.n}
           revealed={revealed}
+          hideWord={hidePromptText}
         />
 
         <View style={styles.vsContainer}>
@@ -84,6 +85,7 @@ export function AudioPairQuestion({ question, status, chosen, onChoose, hideProm
           onPress={() => onPress(wordB.word)}
           syllableCount={wordB.n}
           revealed={revealed}
+          hideWord={hidePromptText}
         />
       </View>
 
@@ -98,7 +100,7 @@ export function AudioPairQuestion({ question, status, chosen, onChoose, hideProm
             styles.hintText,
             { color: chosen === question.correct ? theme.colors.feedback.successText : theme.colors.feedback.errorText },
           ]}>
-            {question.correct} daha uzun ({question.correct === wordA.word ? wordA.n : wordB.n} hece)
+            {question.correct} daha uzun ({(question.correct === wordA.word ? wordA.word : wordB.word).replace(/\s+/g, '').length} harf)
           </Text>
         </View>
       )}
@@ -115,9 +117,11 @@ interface CardProps {
   onPress:       () => void;
   syllableCount: number;
   revealed:      boolean;
+  /** Hide the word label + count dots so the child must judge length by ear. */
+  hideWord?:     boolean;
 }
 
-function WordCard({ word, audioUrl, state, onPress, syllableCount, revealed }: CardProps) {
+function WordCard({ word, audioUrl, state, onPress, syllableCount, revealed, hideWord = false }: CardProps) {
   const borderColor =
     state === 'correct'  ? theme.colors.feedback.success  :
     state === 'wrong'    ? theme.colors.feedback.error     :
@@ -148,26 +152,31 @@ function WordCard({ word, audioUrl, state, onPress, syllableCount, revealed }: C
       ) : null}
 
       <WordImage word={word} size={88} bg={'transparent'} />
-      <Text
-        style={styles.cardWord}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.55}
-      >{word.word}</Text>
+      {/* The word text and the count dots both give the answer away, so they
+          stay hidden until the answer is revealed when hideWord is set. */}
+      {(!hideWord || revealed) && (
+        <Text
+          style={styles.cardWord}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.55}
+        >{word.word}</Text>
+      )}
 
-      {/* Syllable dots */}
-      <View style={styles.syllableDots}>
-        {Array.from({ length: syllableCount }).map((_, i) => (
-          <View
-            key={i}
-            style={[
-              styles.dot,
-              state === 'correct' && styles.dotCorrect,
-              state === 'wrong'   && styles.dotWrong,
-            ]}
-          />
-        ))}
-      </View>
+      {(!hideWord || revealed) && (
+        <View style={styles.syllableDots}>
+          {Array.from({ length: syllableCount }).map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.dot,
+                state === 'correct' && styles.dotCorrect,
+                state === 'wrong'   && styles.dotWrong,
+              ]}
+            />
+          ))}
+        </View>
+      )}
 
       <SpeakerButton
         audioUrl={audioUrl}
