@@ -71,7 +71,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     id:              'harf',
     icon:            '🔤',
     title:           'Harf Avcısı',
-    description:     'Kelime hangi harfle başlar?',
+    description:     'Bu kelimede o harf var mı?',
     science:         'Harf-ses bilgisi, alfabetik prensip için zorunludur. Başlangıç sesinin tanınması, fonetik kodlamanın ilk aşamasıdır. (Lundberg ve ark., 1988)',
     familyTip:       'Sokakta gördüğünüz tabelaların, ürün isimlerinin ilk harflerini birlikte bulun.',
     color:           '#FF7043',
