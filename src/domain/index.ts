@@ -39,7 +39,8 @@ export {
  */
 export const HIDE_PROMPT_TEXT_MODULES = new Set<string>([
   'ayirtEtme',
-  'harf',
+  // 'harf' is NOT hidden: its prompt is "Bu kelimede 'X' harfi var mıydı?" which
+  // doesn't spell out the word — the word itself stays hidden behind the image.
   'hecele',
   'sonHece',
   'uzunKelime',
@@ -47,7 +48,8 @@ export const HIDE_PROMPT_TEXT_MODULES = new Set<string>([
   'ilkSes',
   'sonSes',
   'fonemSilme',
-  'uyakUretim',
+  // 'uyakUretim' is NOT hidden: it's the mirror of uyak — the child must READ
+  // the target word (yazı) and pick the rhyming picture, so the word is shown.
   'ilkHeceSilme',
   'sonHeceSilme',
   // Tamamla and Baştan Tamamla render the syllable hint below the image

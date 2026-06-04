@@ -4,8 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { theme, MIN_TOUCH_TARGET } from '@/theme';
+import { WordImage } from '@/components';
 import { SpeakerButton } from './SpeakerButton';
 import type { Question } from '@/domain';
+import type { Word } from '@/domain/types/word.types';
 
 interface Props {
   question:    Question;
@@ -37,6 +39,13 @@ export function MultipleChoiceQuestion({
 }: Props) {
   const revealed = status === 'revealed';
   const audioUrl = (question.word as any).tts_url ?? (question.word as any).audio_url ?? null;
+
+  // When a module supplies `optionWords` (e.g. uyakUretim — the rhyme-production
+  // mirror), the answer tiles render the words as PICTURES instead of text. The
+  // child reads the target word above and picks the matching rhyme image.
+  const optionWords = (question.extra?.optionWords as Word[] | undefined) ?? null;
+  const wordForOption = (opt: string): Word | null =>
+    optionWords?.find(w => w.word === opt) ?? null;
 
   const onTilePress = (option: string) => {
     if (revealed) return;
@@ -85,6 +94,8 @@ export function MultipleChoiceQuestion({
             bd = theme.colors.brand.primary;
           }
 
+          const imgWord = wordForOption(opt);
+
           return (
             <Pressable
               key={`${opt}-${idx}`}
@@ -92,9 +103,13 @@ export function MultipleChoiceQuestion({
               accessibilityRole="button"
               accessibilityLabel={opt}
               accessibilityState={{ selected: isChosen, disabled: revealed }}
-              style={[styles.tile, { backgroundColor: bg, borderColor: bd }]}
+              style={[styles.tile, imgWord ? styles.imageTile : null, { backgroundColor: bg, borderColor: bd }]}
             >
-              <Text style={styles.tileText} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.6}>{opt}</Text>
+              {imgWord ? (
+                <WordImage word={imgWord} size={96} bg="transparent" />
+              ) : (
+                <Text style={styles.tileText} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.6}>{opt}</Text>
+              )}
               {icon ? (
                 <View style={styles.tileIcon}>
                   <Ionicons
@@ -147,6 +162,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...theme.shadow.sm,
+  },
+  imageTile: {
+    paddingVertical: theme.spacing[3],
   },
   tileText: {
     ...theme.typography.h4,

@@ -52,11 +52,23 @@ export function QuestionPrompt({
     );
   }
 
-  // uyak / uyakUretim → reference word + image. When the module hides prompt
-  // text, the reference word must not be readable either (it's the target the
-  // child has to find a rhyme for) — they hear it via the speaker + see the
-  // picture instead.
-  if (moduleId === 'uyak' || moduleId === 'uyakUretim') {
+  // uyakUretim → the MIRROR of uyak: the child READS the target word (text) and
+  // picks the rhyming PICTURE from the image options below. So the prompt visual
+  // is the word as text, with no image (the images live in the answer tiles).
+  if (moduleId === 'uyakUretim') {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.refWord} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.4}>
+          {question.word.word}
+        </Text>
+      </View>
+    );
+  }
+
+  // uyak → reference image + speaker. The word itself is hidden (it's the target
+  // the child has to find a rhyme for) — they hear it via the speaker + see the
+  // picture, then pick the rhyming word from text options.
+  if (moduleId === 'uyak') {
     const hideWord = HIDE_PROMPT_TEXT_MODULES.has(moduleId);
     return (
       <View style={styles.center}>

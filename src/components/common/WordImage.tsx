@@ -31,8 +31,12 @@ interface Props {
  * SvgErrorBoundary is the final safety net for markup that passes the cheap
  * check but still trips the parser.
  */
-export function WordImage({ word, size = 96, bg = theme.colors.background.secondary }: Props) {
+export function WordImage({ word, size = 96, bg = 'transparent' }: Props) {
   const dim = { width: size, height: size };
+  // Only draw the rounded "card" chrome (background + drop shadow) when a real
+  // background is requested. By default the illustration floats on its own —
+  // no grey square, no shadow box — so you just see the image.
+  const elevated = bg !== 'transparent';
 
   const isSvg = !!word.image_url && (
     word.image_type === 'svg' ||
@@ -61,7 +65,7 @@ export function WordImage({ word, size = 96, bg = theme.colors.background.second
     <Ionicons name="image-outline" size={size * 0.4} color={theme.colors.text.muted} />
   );
   const card = (children: React.ReactNode) => (
-    <View style={[styles.card, dim, { backgroundColor: bg }]}>{children}</View>
+    <View style={[styles.card, dim, { backgroundColor: bg }, elevated ? styles.elevated : null]}>{children}</View>
   );
 
   if (word.image_url) {
@@ -114,10 +118,13 @@ class SvgErrorBoundary extends React.Component<
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: theme.radius.xl,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+  },
+  // Card chrome — applied only when a non-transparent bg is requested.
+  elevated: {
+    borderRadius: theme.radius.xl,
     ...theme.shadow.sm,
   },
   image: { borderRadius: theme.radius.lg },
