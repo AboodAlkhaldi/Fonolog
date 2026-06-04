@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '@/theme';
 import { WordImage } from '@/components';
+import { HIDE_PROMPT_TEXT_MODULES } from '@/domain';
 import type { Question } from '@/domain';
 
 /**
@@ -31,7 +32,7 @@ export function QuestionPrompt({
     return (
       <View style={styles.center}>
         <WordImage word={question.word} size={140} />
-        <Text style={styles.syllableText}>
+        <Text style={styles.syllableText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
           {syllable}<Text style={styles.dim}>___</Text>
         </Text>
       </View>
@@ -44,18 +45,26 @@ export function QuestionPrompt({
     return (
       <View style={styles.center}>
         <WordImage word={question.word} size={140} />
-        <Text style={styles.syllableText}>
+        <Text style={styles.syllableText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
           <Text style={styles.dim}>___</Text>{lastSyl}
         </Text>
       </View>
     );
   }
 
-  // uyak / uyakUretim → reference word styled prominently with image
+  // uyak / uyakUretim → reference word + image. When the module hides prompt
+  // text, the reference word must not be readable either (it's the target the
+  // child has to find a rhyme for) — they hear it via the speaker + see the
+  // picture instead.
   if (moduleId === 'uyak' || moduleId === 'uyakUretim') {
+    const hideWord = HIDE_PROMPT_TEXT_MODULES.has(moduleId);
     return (
       <View style={styles.center}>
-        <Text style={styles.refWord}>{question.word.word}</Text>
+        {!hideWord && (
+          <Text style={styles.refWord} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
+            {question.word.word}
+          </Text>
+        )}
         <WordImage word={question.word} size={120} />
       </View>
     );

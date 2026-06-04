@@ -41,7 +41,14 @@ export function KeyboardPhonemeQuestion({ question, status, onChoose, hidePrompt
 
       <View style={styles.card}>
         <WordImage word={question.word} size={120} />
-        <Text style={styles.word}>{question.word.word}</Text>
+        {/* When hidePromptText is set the word must not be readable — the child
+            identifies it from the picture + audio, otherwise the deletion task
+            becomes a free read. */}
+        {!hidePromptText && (
+          <Text style={styles.word} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
+            {question.word.word}
+          </Text>
+        )}
         <SpeakerButton audioUrl={audioUrl} size={48} style={{ marginTop: theme.spacing[3] }} />
       </View>
 
@@ -86,7 +93,7 @@ export function KeyboardPhonemeQuestion({ question, status, onChoose, hidePrompt
       ) : (
         <View style={styles.revealedBox}>
           <Text style={styles.revealedLabel}>Doğru cevap:</Text>
-          <Text style={styles.revealedAnswer}>{question.correct}</Text>
+          <Text style={styles.revealedAnswer} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{question.correct}</Text>
         </View>
       )}
     </View>
