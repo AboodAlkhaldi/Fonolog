@@ -15,7 +15,7 @@ import { SequenceQuestion }         from '@/components/session/SequenceQuestion'
 import { VisualPerceptionQuestion } from '@/components/session/VisualPerceptionQuestion';
 import { QuestionPrompt }         from '@/components/session/QuestionPrompt';
 import { useSession, sessionProgress } from '@/store/session';
-import { getModule, HIDE_PROMPT_TEXT_MODULES } from '@/domain';
+import { getModule, HIDE_PROMPT_TEXT_MODULES, AUTO_ADVANCE_MODULES } from '@/domain';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
@@ -90,6 +90,20 @@ export default function SessionScreen() {
   const moduleDef  = getModule(moduleId);
   const screenType = moduleDef?.screenType;
   const hidePromptText = HIDE_PROMPT_TEXT_MODULES.has(moduleId);
+  const autoAdvance    = AUTO_ADVANCE_MODULES.has(moduleId);
+
+  // Auto-advance modules skip the reveal/verdict step: record the answer and
+  // immediately move on. The two store updates are synchronous, so the
+  // 'revealed' state never renders — the next item (or result screen) shows at
+  // once. All other modules use the standard answer → reveal → Devam flow.
+  const onAnswer = (chosen: string) => {
+    if (autoAdvance) {
+      answer(chosen);
+      next();
+    } else {
+      answer(chosen);
+    }
+  };
 
   if (status === 'loading') return <Screen><Loading message={t('session.loading')} /></Screen>;
 
@@ -154,14 +168,14 @@ export default function SessionScreen() {
             question={question}
             status={qStatus}
             chosen={lastChosen}
-            onChoose={answer}
+            onChoose={onAnswer}
           />
         ) : screenType === 'audio-pair' ? (
           <AudioPairQuestion
             question={question}
             status={qStatus}
             chosen={lastChosen}
-            onChoose={answer}
+            onChoose={onAnswer}
             hidePromptText={hidePromptText}
           />
         ) : screenType === 'phoneme' ? (
@@ -169,7 +183,7 @@ export default function SessionScreen() {
             question={question}
             status={qStatus}
             chosen={lastChosen}
-            onChoose={answer}
+            onChoose={onAnswer}
             hidePromptText={hidePromptText}
           />
         ) : screenType === 'explore' ? (
@@ -177,21 +191,21 @@ export default function SessionScreen() {
             question={question}
             status={qStatus}
             chosen={lastChosen}
-            onChoose={answer}
+            onChoose={onAnswer}
           />
         ) : screenType === 'sequence' ? (
           <SequenceQuestion
             question={question}
             status={qStatus}
             chosen={lastChosen}
-            onChoose={answer}
+            onChoose={onAnswer}
           />
         ) : screenType === 'visual' ? (
           <VisualPerceptionQuestion
             question={question}
             status={qStatus}
             chosen={lastChosen}
-            onChoose={answer}
+            onChoose={onAnswer}
           />
         ) : (
           screenType === 'pronunciation' ||
@@ -202,14 +216,14 @@ export default function SessionScreen() {
             question={question}
             status={qStatus}
             chosen={lastChosen}
-            onChoose={answer}
+            onChoose={onAnswer}
           />
         ) : (
           <MultipleChoiceQuestion
             question={question}
             status={qStatus}
             chosen={lastChosen}
-            onChoose={answer}
+            onChoose={onAnswer}
             promptSlot={<QuestionPrompt moduleId={moduleId} question={question} />}
             hidePromptText={hidePromptText}
           />
