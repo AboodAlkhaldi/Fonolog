@@ -4,11 +4,13 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Purchases, { type CustomerInfo } from 'react-native-purchases';
 
-import { Screen, Button, Loading, Badge } from '@/components';
+import { Screen, Button, Loading, Badge, Input } from '@/components';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/store/alert';
 import { getAccessTier, trialDaysRemaining, subscriptionLabel } from '@/lib/access-tier';
 import { differenceInCalendarDays } from 'date-fns';
 import { getPricing, formatPrice, type PricingRow } from '@/lib/pricing';
+import { redeemCoupon, type RedeemStatus } from '@/lib/coupons';
 import { SUPPORT_EMAIL, supportMailto } from '@/lib/contact';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
@@ -18,14 +20,50 @@ function formatDate(iso: string | null | undefined): string {
   return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+function couponErrorMessage(status: RedeemStatus): string {
+  switch (status) {
+    case 'used_up':          return t('coupon.errUsedUp');
+    case 'already_redeemed': return t('coupon.errAlreadyRedeemed');
+    case 'already_pro':      return t('coupon.errAlreadyPro');
+    case 'invalid':          return t('coupon.errInvalid');
+    default:                 return t('coupon.errGeneric');
+  }
+}
+
 export default function PlanDetails() {
-  const profile = useAuth((s) => s.profile);
+  const profile        = useAuth((s) => s.profile);
+  const refreshProfile = useAuth((s) => s.refreshProfile);
   const tier    = getAccessTier(profile);
   const trialDays = trialDaysRemaining(profile);
 
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [pricing, setPricing] = useState<PricingRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Coupon redemption — only shown to non-Pro users (a Pro user has no reason to
+  // redeem, and the section is hidden for them entirely).
+  const [couponCode, setCouponCode]   = useState('');
+  const [redeeming, setRedeeming]     = useState(false);
+
+  const onRedeemCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setRedeeming(true);
+    try {
+      const res = await redeemCoupon(couponCode);
+      if (res.ok && res.status === 'success') {
+        await refreshProfile();
+        const date = res.expiresAt
+          ? new Date(res.expiresAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+          : '';
+        setCouponCode('');
+        showAlert(t('coupon.successTitle'), t('coupon.successMsg', { date }));
+      } else {
+        showAlert(t('app.error_title'), couponErrorMessage(res.status));
+      }
+    } finally {
+      setRedeeming(false);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -47,10 +85,9 @@ export default function PlanDetails() {
 
   if (loading) return <Screen><Loading /></Screen>;
 
+  // Teacher subscriptions are disabled — only the student entitlement is sold.
   const activeEntitlement =
-    customerInfo?.entitlements.active['fonolog_teacher'] ??
-    customerInfo?.entitlements.active['fonolog_student'] ??
-    null;
+    customerInfo?.entitlements.active['fonolog_student'] ?? null;
 
   const productId = activeEntitlement?.productIdentifier ?? null;
   const planRow = pricing.find((p) => p.product_id === productId) ?? null;
@@ -152,6 +189,32 @@ export default function PlanDetails() {
           />
         ) : null}
 
+        {/* Promosyon kodu — only for users with NO current access (tier 'free',
+            which includes expired trials). Paid/coupon Pro, active trial, and
+            admin never see it; redeeming over an active entitlement makes no
+            sense and is also blocked server-side. */}
+        {tier === 'free' ? (
+          <View style={styles.couponCard}>
+            <Text style={styles.couponTitle}>{t('coupon.sectionTitle')}</Text>
+            <Text style={styles.couponDesc}>{t('coupon.sectionDesc')}</Text>
+            <Input
+              value={couponCode}
+              onChangeText={setCouponCode}
+              placeholder={t('coupon.inputPlaceholder')}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!redeeming}
+              containerStyle={{ marginTop: theme.spacing[3], marginBottom: theme.spacing[2] }}
+            />
+            <Button
+              label={t('coupon.redeemBtn')}
+              variant="primary" size="md" fullWidth
+              loading={redeeming}
+              onPress={onRedeemCoupon}
+            />
+          </View>
+        ) : null}
+
         <Text style={styles.section}>{t('planDetails.proTitle')}</Text>
         <View style={styles.featuresCard}>
           <Feature icon="game-controller-outline" text={t('planDetails.proF1')} />
@@ -233,4 +296,12 @@ const styles = StyleSheet.create({
     color: theme.colors.feedback.successText,
     flex: 1,
   },
+  couponCard: {
+    backgroundColor: theme.colors.background.secondary,
+    padding: theme.spacing[4], borderRadius: theme.radius.lg,
+    marginTop: theme.spacing[4],
+    borderWidth: 1, borderColor: theme.colors.border.subtle,
+  },
+  couponTitle: { ...theme.typography.h4, color: theme.colors.text.primary },
+  couponDesc:  { ...theme.typography.bodySmall, color: theme.colors.text.muted, marginTop: theme.spacing[1] },
 });
