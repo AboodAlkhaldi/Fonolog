@@ -14,7 +14,10 @@ import type { CouponRow, CouponState } from './database.types';
 
 export type RedeemStatus =
   | 'success'
-  | 'invalid'           // no such active coupon
+  | 'invalid'           // legacy catch-all (older RPC); treat like not_found
+  | 'not_found'         // no coupon matched the code
+  | 'inactive'          // coupon exists but is switched off
+  | 'no_profile'        // redeeming user has no profile row (shouldn't happen)
   | 'used_up'           // max_redemptions reached
   | 'already_redeemed'  // this user already used THIS coupon
   | 'already_pro'       // user is currently Pro/trial

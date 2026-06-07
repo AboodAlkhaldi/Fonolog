@@ -42,7 +42,9 @@ export default function CouponEditor() {
   }, [id]);
 
   const onSubmit = async () => {
-    const trimmed = code.trim();
+    // Store uppercase so the code is canonical; redemption matches
+    // case-insensitively (redeem_coupon), so students can type any case.
+    const trimmed = code.trim().toUpperCase();
     if (!trimmed) { showAlert(t('app.error_title'), t('coupon.codeRequired')); return; }
 
     const days = Math.max(1, parseInt(freeDays, 10) || 30);
@@ -50,7 +52,7 @@ export default function CouponEditor() {
     setSubmitting(true);
 
     const payload: any = {
-      code: trimmed,           // case-sensitive — stored exactly as typed
+      code: trimmed,           // canonical uppercase; redemption is case-insensitive
       free_days: days,
       max_redemptions: max,
       is_active: isActive,

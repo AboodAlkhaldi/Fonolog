@@ -25,7 +25,11 @@ function couponErrorMessage(status: RedeemStatus): string {
     case 'used_up':          return t('coupon.errUsedUp');
     case 'already_redeemed': return t('coupon.errAlreadyRedeemed');
     case 'already_pro':      return t('coupon.errAlreadyPro');
-    case 'invalid':          return t('coupon.errInvalid');
+    // not_found / inactive / no_profile / legacy 'invalid' → same friendly text.
+    case 'invalid':
+    case 'not_found':
+    case 'inactive':
+    case 'no_profile':       return t('coupon.errInvalid');
     default:                 return t('coupon.errGeneric');
   }
 }
