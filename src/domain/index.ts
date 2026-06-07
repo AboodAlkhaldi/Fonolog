@@ -41,6 +41,9 @@ export const HIDE_PROMPT_TEXT_MODULES = new Set<string>([
   'ayirtEtme',
   // 'harf' is NOT hidden: its prompt is "Bu kelimede 'X' harfi var mıydı?" which
   // doesn't spell out the word — the word itself stays hidden behind the image.
+  'heceC',   // "kaç heceli?" — the prompt printed the word verbatim, letting a
+             // reader count syllables by sight. Hidden so the child must LISTEN
+             // (image + speaker only); the number tiles stay as the answer.
   'hecele',
   'sonHece',
   'uzunKelime',
@@ -84,6 +87,9 @@ export type { ITeacherRepository }      from './interfaces/teacher-repository.in
 export type { ISpeechRecognizer }       from './interfaces/speech-recognizer.interface';
 export type { ISubscriptionService }    from './interfaces/subscription-service.interface';
 export type { INotificationService }    from './interfaces/notification-service.interface';
+
+// ── Multi-word phrase helpers (used by session components) ──
+export { boundaryAfter, joinSyl } from './generators/utils';
 
 // ── Adapters (rarely needed outside domain, but exposed for tests) ──
 export {
