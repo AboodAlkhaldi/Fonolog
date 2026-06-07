@@ -59,7 +59,7 @@ function useProtectedRoute(status: AuthStatus, role: string | null, impersonatin
     const root = segments[0];
 
     switch (status) {
-      case 'unauthenticated': 
+      case 'unauthenticated':
         if (root !== '(auth)') router.replace('/(auth)/welcome');
         return;
 
@@ -77,10 +77,6 @@ function useProtectedRoute(status: AuthStatus, role: string | null, impersonatin
 
       case 'needsOnboarding':
         if (root !== '(onboarding)') router.replace('/(onboarding)/child-age');
-        return;
-
-      case 'needsPasswordReset':
-        if (root !== 'reset-password') router.replace('/reset-password');
         return;
 
       case 'authenticated':

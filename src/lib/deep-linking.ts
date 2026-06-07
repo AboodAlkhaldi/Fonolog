@@ -1,23 +1,18 @@
 /**
  * Deep-link handling for Supabase auth flows.
  *
- * Supabase password-recovery emails redirect to:
- *   fonolog://reset-password#access_token=...&refresh_token=...&type=recovery
+ * Currently this handles ONLY the signup-confirmation link:
+ *   fonolog://verified#access_token=...&refresh_token=...&type=signup
+ *
+ * Password recovery is NOT handled here. The logged-out forgot-password flow
+ * was removed entirely (it relied on a single-use token deep-link that email
+ * scanners pre-consumed and custom-scheme redirects that in-app browsers
+ * blocked). The only password change left is the logged-in Settings flow in
+ * app/reset-password.tsx.
  *
  * The Supabase JS client has `detectSessionInUrl: false` on native (correct —
- * there is no `window.location`), so we parse the URL ourselves, install the
- * session, and ask the auth store to flip status to `needsPasswordReset`, which
- * the protected-route hook routes to `/reset-password`.
- *
- * Robustness notes:
- *  - We detect recovery by `type=recovery` OR a `reset-password` path. If
- *    `fonolog://reset-password` isn't in the project's allowed Redirect URLs,
- *    GoTrue falls back to the Site URL and the recovery tokens land on a
- *    different path — keying only off the path silently dropped them, which
- *    sent the user to the welcome screen instead of reset-password.
- *  - We accept both the implicit flow (access/refresh tokens in the fragment)
- *    and the PKCE flow (`?code=`), and we read params from BOTH the query
- *    string and the fragment.
+ * there is no `window.location`), so we parse the confirmation URL ourselves,
+ * install the session, and let onAuthStateChange route the now-verified user.
  *
  * Wiring: auth.ts:initialize() calls setupDeepLinks once at app start.
  */
@@ -39,16 +34,11 @@ function paramsFromUrl(url: string): URLSearchParams {
 }
 
 /**
- * Wires Linking events to Supabase session restoration.
- * `onRecovery` is invoked after the session is installed for a password-recovery
- * link. `onVerified` is invoked after a signup-confirmation link.
+ * Wires Linking events to Supabase session restoration for the signup
+ * confirmation link. `onVerified` is invoked after the session is installed.
  * Returns a teardown function.
  */
-export function setupDeepLinks(
-  onRecovery: () => void,
-  onVerified?: () => void,
-  onRecoveryError?: () => void,
-): () => void {
+export function setupDeepLinks(onVerified?: () => void): () => void {
   const handle = async (url: string | null) => {
     if (!url) return;
 
@@ -59,19 +49,14 @@ export function setupDeepLinks(
     const refresh_token = params.get('refresh_token') ?? '';
     const authError     = params.get('error_code') || params.get('error');
 
-    const isRecovery = type === 'recovery' || url.includes('reset-password');
-    const isSignup   = type === 'signup'   || url.includes('verified');
+    const isSignup = type === 'signup' || url.includes('verified');
 
-    // Ignore links that carry no auth payload we recognise (normal deep links).
-    if (!code && !access_token && !authError && !isRecovery && !isSignup) return;
+    // Ignore links that carry no signup payload we recognise (normal deep links).
+    if (!isSignup) return;
+    if (!code && !access_token && !authError) return;
 
-    // Expired / already-used / invalid link. GoTrue returns this in the
-    // fragment (e.g. error_code=otp_expired) when the single-use token has
-    // already been consumed or has lapsed. Tell the app so it can guide the
-    // user to request a fresh link instead of silently leaving them stranded.
     if (authError) {
       console.warn('[deep-link] auth error:', authError, params.get('error_description') ?? '');
-      if (isRecovery) onRecoveryError?.();
       return;
     }
 
@@ -88,15 +73,7 @@ export function setupDeepLinks(
       else established = true;
     }
 
-    if (!established) {
-      // We saw a recovery link but couldn't install a session (expired/invalid
-      // tokens, or fragment stripped). Surface it rather than no-op.
-      if (isRecovery) onRecoveryError?.();
-      return;
-    }
-
-    if (isRecovery) onRecovery();
-    else if (isSignup) onVerified?.();
+    if (established) onVerified?.();
   };
 
   Linking.getInitialURL()

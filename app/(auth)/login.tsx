@@ -73,10 +73,6 @@ export default function LoginScreen() {
         required
       />
 
-      <Pressable onPress={() => router.push('/(auth)/forgot')} hitSlop={6} style={styles.forgotWrap}>
-        <Text style={styles.link}>{t('auth.login.forgot')}</Text>
-      </Pressable>
-
       <Button
         label={t('auth.login.submit')}
         variant="cta"
@@ -110,19 +106,13 @@ const styles = StyleSheet.create({
   },
   title:    { ...theme.typography.h1, color: theme.colors.text.primary },
   subtitle: { ...theme.typography.body, color: theme.colors.text.secondary, marginTop: theme.spacing[1] },
-  forgotWrap: {
-    alignSelf: 'flex-end',
-    marginTop: -theme.spacing[2],
-    marginBottom: theme.spacing[4],
-    padding: theme.spacing[2],
-  },
   link: {
     ...theme.typography.body,
     color: theme.colors.text.link,
     fontFamily: theme.typography.bodyLarge.fontFamily,
   },
   submit: {
-    marginTop: theme.spacing[2],
+    marginTop: theme.spacing[4],
   },
   footer: {
     flexDirection:  'row',

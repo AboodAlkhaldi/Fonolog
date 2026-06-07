@@ -33,7 +33,6 @@ export type AuthStatus =
   | 'needsRoleChoice'
   | 'needsOnboarding'
   | 'needsTeacherSignup'
-  | 'needsPasswordReset'
   | 'authenticated';
 
 export type Profile = ProfileRow;
@@ -169,34 +168,14 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ status: 'unauthenticated', session: null, user: null, profile: null });
     }
 
-    // Deep-link recovery: parse fonolog://reset-password#access_token=... and
-    // install the session. After that, flip status so the protected route
-    // navigates to /reset-password. This is needed because on native we run
-    // with detectSessionInUrl: false, so Supabase does not auto-handle the URL.
-    setupDeepLinks(
-      () => { set({ status: 'needsPasswordReset' }); },
-      () => {
-        // Signup confirmation: refresh profile and let deriveStatus route the
-        // user to role-choice / dashboard. The setSession in deep-linking.ts
-        // already installed the session, which will trigger onAuthStateChange.
-      },
-      () => {
-        // Recovery link that couldn't install a session (expired / already
-        // used / invalid). Still route to the reset-password screen — it's
-        // token-gated and will show an "expired, request a new link" state
-        // when no recovery session is present, instead of stranding the user
-        // on the welcome screen.
-        set({ status: 'needsPasswordReset' });
-      },
-    );
+    // Deep-link: signup confirmation only (fonolog://verified#...). There is no
+    // logged-out password-recovery flow anymore (the email/deep-link reset was
+    // removed); the only password change is the logged-in Settings flow in
+    // app/reset-password.tsx. The setSession in deep-linking.ts triggers
+    // onAuthStateChange, which refreshes the profile and routes the verified user.
+    setupDeepLinks();
 
     supabase.auth.onAuthStateChange(async (event, newSession) => {
-      // Password recovery deep link → route to reset-password page.
-      if (event === 'PASSWORD_RECOVERY') {
-        set({ status: 'needsPasswordReset', session: newSession, user: newSession?.user ?? null });
-        return;
-      }
-
       // Signed out (or any event without a session) → clear and let the
       // protected route send the user to welcome.
       if (event === 'SIGNED_OUT' || !newSession?.user) {
@@ -213,7 +192,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       // racing the explicit fetch and momentarily downgrading to
       // 'unauthenticated'. (We still defer to an in-progress password reset.)
       const sameUserKnown = !!prev.profile && prev.user?.id === newSession.user.id;
-      if ((explicitAuthInFlight || sameUserKnown) && prev.status !== 'needsPasswordReset') {
+      if (explicitAuthInFlight || sameUserKnown) {
         set({ session: newSession, user: newSession.user });
         return;
       }
@@ -241,13 +220,6 @@ export const useAuth = create<AuthState>((set, get) => ({
           supabase.functions.invoke('send-welcome-email', {
             body: { user_id: newSession.user.id },
           }).catch((e) => console.warn('[auth] welcome email failed', e));
-        }
-
-        // If a recovery deep-link already flipped us to needsPasswordReset,
-        // preserve that while a session is present.
-        if (get().status === 'needsPasswordReset') {
-          set({ session: newSession, user: newSession.user, profile: p ?? prev.profile });
-          return;
         }
 
         if (p) offlineCache.setProfile(p);

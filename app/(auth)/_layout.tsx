@@ -7,7 +7,6 @@ export default function AuthLayout() {
       <Stack.Screen name="register"       />
       <Stack.Screen name="login"          />
       <Stack.Screen name="verify-email"   />
-      <Stack.Screen name="forgot"         />
       <Stack.Screen name="role-choice"    options={{ gestureEnabled: false }} />
       <Stack.Screen name="teacher-signup" options={{ gestureEnabled: false }} />
     </Stack>
