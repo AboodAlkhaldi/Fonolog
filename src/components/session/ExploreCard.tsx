@@ -4,6 +4,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '@/theme';
 import { Button, WordImage } from '@/components';
 import { SpeakerButton } from './SpeakerButton';
+import { boundaryAfter } from '@/domain';
 import type { Question } from '@/domain';
 
 const SYLLABLE_COLORS = ['#F5A623', '#42A5F5', '#AB47BC', '#26C6DA', '#EC407A'];
@@ -20,6 +21,9 @@ export function ExploreCard({ question, status, onChoose }: Props) {
   const syllables  = (question.extra?.syllables as string[] | undefined) ?? [question.word.word];
   const firstLetter = (question.extra?.firstLetter as string | undefined) ?? question.word.word[0] ?? '';
   const lastLetter  = (question.extra?.lastLetter  as string | undefined) ?? question.word.word[question.word.word.length - 1] ?? '';
+  // Word breaks for multi-word phrases ("bal kabağı") → push each word's
+  // syllables onto its own row instead of one long strip.
+  const breaks = boundaryAfter({ word: question.word.word, syl: syllables });
 
   return (
     <View style={styles.container}>
@@ -33,12 +37,14 @@ export function ExploreCard({ question, status, onChoose }: Props) {
           word never runs off the screen edge. */}
       <View style={styles.syllableRow}>
         {syllables.map((syl, i) => (
-          <View
-            key={i}
-            style={[styles.sylBlock, { backgroundColor: SYLLABLE_COLORS[i % SYLLABLE_COLORS.length] }]}
-          >
-            <Text style={styles.sylText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{syl}</Text>
-          </View>
+          <React.Fragment key={i}>
+            <View
+              style={[styles.sylBlock, { backgroundColor: SYLLABLE_COLORS[i % SYLLABLE_COLORS.length] }]}
+            >
+              <Text style={styles.sylText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{syl}</Text>
+            </View>
+            {breaks.has(i) && i < syllables.length - 1 ? <View style={styles.wordBreak} /> : null}
+          </React.Fragment>
         ))}
       </View>
 
@@ -100,6 +106,9 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing[2],
     maxWidth: '90%',
   },
+  // Zero-height full-width element: forces the next word's syllables to wrap
+  // onto a new row, visually separating the two words.
+  wordBreak: { width: '100%', height: 0 },
   sylText: {
     ...theme.typography.h2,
     color: theme.colors.text.inverse,

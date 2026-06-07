@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { theme, MIN_TOUCH_TARGET } from '@/theme';
 import { WordImage } from '@/components';
+import { boundaryAfter, joinSyl } from '@/domain';
 import type { Question } from '@/domain';
 
 interface Props {
@@ -35,15 +36,27 @@ export function BuilderQuestion({ question, status, chosen, onChoose }: Props) {
 
   const [picked, setPicked] = useState<number[]>([]);   // tile indices, in order
 
-  // Reset local state on a new question
-  useEffect(() => {
+  // Reset placed tiles SYNCHRONOUSLY when the question changes. Doing this in a
+  // post-render effect left a one-frame window where the previous word's picks
+  // indexed into the new word's tiles — a brief flash of stray letters in the
+  // box on "Devam". Resetting during render discards that frame entirely.
+  const [seenQid, setSeenQid] = useState(question.id);
+  if (question.id !== seenQid) {
+    setSeenQid(question.id);
     setPicked([]);
-  }, [question.id]);
+  }
 
-  // After reveal, force-show the chosen string
-  const assembled = revealed && chosen
-    ? chosen
-    : picked.map((i) => tiles[i]).join('');
+  const isCorrect = revealed && chosen === question.correct;
+  // Word breaks for multi-word phrases. Validation stays space-insensitive
+  // (gen-hece-birlestir's `correct` is the bare concatenation), so the space is
+  // display-only: inserted after the tile that sits on a word break.
+  const breaks = boundaryAfter(question.word);
+  const liveAssembled = picked
+    .map((tileIdx, pos) => tiles[tileIdx] + (breaks.has(pos) && pos < picked.length - 1 ? ' ' : ''))
+    .join('');
+  const assembled = revealed
+    ? (isCorrect ? joinSyl(question.word, 0, question.word.syl.length) : (chosen ?? ''))
+    : liveAssembled;
 
   const onTilePress = (idx: number) => {
     if (revealed) return;
@@ -65,7 +78,6 @@ export function BuilderQuestion({ question, status, chosen, onChoose }: Props) {
   };
 
   // After reveal, color the assembly
-  const isCorrect = revealed && chosen === question.correct;
   const assemblyColor = !revealed
     ? theme.colors.text.primary
     : isCorrect
@@ -96,7 +108,7 @@ export function BuilderQuestion({ question, status, chosen, onChoose }: Props) {
 
       {revealed && !isCorrect ? (
         <Text style={styles.correctReveal}>
-          Doğrusu: <Text style={styles.correctRevealBold}>{question.correct}</Text>
+          Doğrusu: <Text style={styles.correctRevealBold}>{joinSyl(question.word, 0, question.word.syl.length)}</Text>
         </Text>
       ) : null}
 
