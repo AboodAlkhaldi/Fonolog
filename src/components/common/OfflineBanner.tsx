@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isOnline } from '@/lib/online-status';
 import { theme } from '@/theme';
 
@@ -17,6 +18,7 @@ const POLL_INTERVAL_MS = 15000;
  * Render this near the top of student-facing screens (e.g. the tabs layout).
  */
 export function OfflineBanner() {
+  const insets = useSafeAreaInsets();
   const [online, setOnline] = useState(true);
 
   useEffect(() => {
@@ -40,7 +42,7 @@ export function OfflineBanner() {
   if (online) return null;
 
   return (
-    <View style={[styles.bar, styles.offline]}>
+    <View style={[styles.bar, styles.offline, { paddingTop: insets.top + theme.spacing[1] }]}>
       <Ionicons
         name="cloud-offline-outline"
         size={16}

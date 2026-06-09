@@ -359,9 +359,16 @@ export const useAuth = create<AuthState>((set, get) => ({
   refreshProfile: async () => {
     const { user, session, profile: prevProfile } = get();
     if (!user) return;
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+    // supabase-js does NOT throw on a network failure — it resolves with
+    // { data: null, error }. If we blindly took `data`, an offline refresh would
+    // overwrite a good profile with null and deriveStatus() would downgrade the
+    // app to 'loading' (blank screen until full restart). Keep the existing
+    // profile/status on any error or empty result — never downgrade a settled
+    // session on a transient failure (same rule as onAuthStateChange).
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+    if (error || !data) return;
     const profile = data as Profile;
-    if (profile) offlineCache.setProfile(profile);
+    offlineCache.setProfile(profile);
     diffPlanAndAlert(prevProfile, profile);
     set({ profile, status: deriveStatus(session, profile) });
   },

@@ -42,8 +42,13 @@ export default function SessionResultScreen() {
 
       try { await finish(); }
       catch (e) { console.warn('[result.finish] failed', e); }
-      try { await refreshProfile(); }
-      catch (e) { console.warn('[result.refreshProfile] failed', e); }
+      // Only refresh the profile when online — the data can't change offline,
+      // and refreshProfile now no-ops on a failed fetch anyway. Skipping avoids
+      // an unnecessary hanging request on the result screen.
+      if (online) {
+        try { await refreshProfile(); }
+        catch (e) { console.warn('[result.refreshProfile] failed', e); }
+      }
       if (!alive) return;
       setPersisted(true);
 

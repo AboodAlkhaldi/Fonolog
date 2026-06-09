@@ -149,7 +149,11 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, status]);
 
-  if (!fontsLoaded || status === 'loading') return null;
+  // Blank only on cold boot: fonts still loading, or status genuinely settling
+  // before any user exists. Once a user is in state, never blank the whole app
+  // on a stray 'loading' — keep the current screen rendered (the protected-route
+  // guard leaves it in place) so a transient status change can't freeze the UI.
+  if (!fontsLoaded || (status === 'loading' && !user)) return null;
 
   return (
     <GestureHandlerRootView style={styles.root}>
