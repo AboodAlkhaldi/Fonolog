@@ -92,16 +92,16 @@ const tr = {
       stillNotReceived:'Hâlâ ulaşmadı mı?',
     },
     forgot: {
-      title:        'Şifremi sıfırla',
-      subtitle:     'Şifre sıfırlama bağlantısı için e-postanızı girin.',
+      title:        'Şifreni sıfırla',
+      subtitle:     'Hesabının e-posta adresini gir; sana 6 haneli bir doğrulama kodu gönderelim.',
       email:        'E-posta',
-      submit:       'Bağlantıyı gönder',
-      // Anti-enumeration: we show this whether the email is registered or not,
-      // so attackers can't probe the user list.
-      sent:         'E-posta sistemimizde kayıtlıysa, şifre sıfırlama bağlantısı gönderildi. E-postanızı kontrol edin.',
+      submit:       'Kod gönder',
+      // Surfaced by auth-errors when an email isn't registered. The forgot
+      // screen itself stays silent and always advances to the code step, so
+      // attackers can't probe which emails exist (anti-enumeration).
       notFound:     'Bu e-posta sistemimizde kayıtlı değil.',
       errors: {
-        generic:    'Şifre sıfırlama bağlantısı gönderilemedi. Lütfen tekrar deneyiniz.',
+        generic:    'Kod gönderilemedi. Lütfen tekrar deneyiniz.',
       },
     },
     roleChoice: {
@@ -141,11 +141,28 @@ const tr = {
       submit:          'Şifreyi Kaydet',
       errorShort:      'Şifre en az 8 karakter olmalı.',
       errorMismatch:   'Şifreler eşleşmiyor.',
-      // Token-gated states for the e-mail link flow.
-      expiredTitle:    'Bağlantı geçersiz veya süresi dolmuş',
-      expiredBody:     'Bu şifre sıfırlama bağlantısı artık geçerli değil. Lütfen yeni bir bağlantı talep et.',
-      requestNew:      'Yeni bağlantı iste',
-      expiredAlert:    'Şifre sıfırlama bağlantısının süresi dolmuş veya daha önce kullanılmış. Lütfen yeni bir bağlantı talep et.',
+    },
+    // Logged-out OTP recovery — enter the 6-digit code + a new password.
+    resetCode: {
+      title:             'Yeni şifre belirle',
+      subtitle:          '{{email}} adresine 6 haneli bir kod gönderdik. Kodu ve yeni şifreni gir.',
+      emailLabel:        'E-posta',
+      codeLabel:         'Doğrulama kodu',
+      codePh:            'E-postana gelen kod',
+      newPassword:       'Yeni şifre',
+      passwordPh:        'En az 8 karakter',
+      confirmPassword:   'Yeni şifre (tekrar)',
+      submit:            'Şifreyi güncelle',
+      resend:            'Yeni kod gönder',
+      resendCooldown:    '{{seconds}}s sonra yeni kod alabilirsin',
+      resendSent:        'Yeni kod gönderildi!',
+      successTitle:      'Şifren güncellendi',
+      successBody:       'Yeni şifrenle giriş yapabilirsin.',
+      errorCodeRequired: 'E-postana gelen kodu gir.',
+      errorShort:        'Şifre en az 8 karakter olmalı.',
+      errorMismatch:     'Şifreler eşleşmiyor.',
+      errorExpired:      'Kodun süresi doldu. Lütfen yeni bir kod iste.',
+      errorInvalid:      'Kod hatalı veya geçersiz. Lütfen kontrol edip tekrar dene.',
     },
     deactivate: {
       // Account deletion has been removed; only the password-reset entry point

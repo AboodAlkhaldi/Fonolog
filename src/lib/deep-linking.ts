@@ -1,14 +1,14 @@
 /**
  * Deep-link handling for Supabase auth flows.
  *
- * Currently this handles ONLY the signup-confirmation link:
+ * This handles ONLY the signup-confirmation link:
  *   fonolog://verified#access_token=...&refresh_token=...&type=signup
  *
- * Password recovery is NOT handled here. The logged-out forgot-password flow
- * was removed entirely (it relied on a single-use token deep-link that email
- * scanners pre-consumed and custom-scheme redirects that in-app browsers
- * blocked). The only password change left is the logged-in Settings flow in
- * app/reset-password.tsx.
+ * Password recovery is deliberately NOT deep-link based. It uses an OTP code
+ * (app/(auth)/forgot-password → reset-password-otp) precisely to avoid the
+ * failures that killed the old deep-link reset: single-use tokens pre-consumed
+ * by email scanners, and custom-scheme redirects blocked by in-app browsers.
+ * The logged-in change-password flow lives in app/reset-password.tsx.
  *
  * The Supabase JS client has `detectSessionInUrl: false` on native (correct —
  * there is no `window.location`), so we parse the confirmation URL ourselves,

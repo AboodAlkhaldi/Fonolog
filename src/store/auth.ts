@@ -70,6 +70,15 @@ interface AuthState {
   /** Admin preview controls. */
   startImpersonation:   (kind: 'student' | 'teacher') => void;
   stopImpersonation:    () => void;
+
+  /**
+   * Suppress the auth listener's profile-fetch + status change while an external
+   * flow temporarily holds a session it will discard. Used by the logged-out
+   * password-recovery screen: verifyOtp installs a short-lived recovery session,
+   * but we must NOT route the user into the app — we update the password and sign
+   * back out. Toggling this keeps status on 'unauthenticated' throughout.
+   */
+  setExternalAuthGuard: (on: boolean) => void;
 }
 
 /** Detect a paid → free transition (or the reverse) and surface a UI popup. */
@@ -168,11 +177,11 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ status: 'unauthenticated', session: null, user: null, profile: null });
     }
 
-    // Deep-link: signup confirmation only (fonolog://verified#...). There is no
-    // logged-out password-recovery flow anymore (the email/deep-link reset was
-    // removed); the only password change is the logged-in Settings flow in
-    // app/reset-password.tsx. The setSession in deep-linking.ts triggers
-    // onAuthStateChange, which refreshes the profile and routes the verified user.
+    // Deep-link: signup confirmation only (fonolog://verified#...). Logged-out
+    // password recovery is OTP-code based (not a deep link) — see
+    // app/(auth)/forgot-password + reset-password-otp. The setSession in
+    // deep-linking.ts triggers onAuthStateChange, which refreshes the profile
+    // and routes the verified user.
     setupDeepLinks();
 
     supabase.auth.onAuthStateChange(async (event, newSession) => {
@@ -422,4 +431,6 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   startImpersonation: (kind) => set({ impersonating: kind }),
   stopImpersonation:  () => set({ impersonating: null }),
+
+  setExternalAuthGuard: (on) => { explicitAuthInFlight = on; },
 }));

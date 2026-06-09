@@ -17,9 +17,10 @@ import { t } from '@/i18n';
  * It always runs with a live session, so it just updates the password and sends
  * the user back to login to sign in with the new credentials.
  *
- * There is no LOGGED-OUT recovery flow — the email/deep-link forgot-password
- * was removed (the "Şifremi unuttum?" link is gone from login). This screen is
- * only reachable by a signed-in user from Settings. See src/lib/deep-linking.ts.
+ * The LOGGED-OUT recovery flow is separate and OTP-based:
+ * app/(auth)/forgot-password → reset-password-otp (reached via "Şifremi
+ * unuttum?" on login). This screen is only reachable by a signed-in user from
+ * Settings. See src/lib/deep-linking.ts.
  */
 export default function ResetPasswordScreen() {
   const signOut = useAuth((s) => s.signOut);
