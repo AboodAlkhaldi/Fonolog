@@ -62,8 +62,13 @@
       ],
       "expo-image",
       "expo-sharing",
-      "expo-sqlite",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Fonolog, karakter ve kelime görselleri seçebilmen için fotoğraflarına erişim ister."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
