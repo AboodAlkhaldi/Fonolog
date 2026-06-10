@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { differenceInCalendarDays } from 'date-fns';
@@ -114,6 +114,21 @@ export default function ProfileTab() {
     ]);
   };
 
+  const onDeleteAccount = () => {
+    if (impersonating) {
+      showAlert(t('profile.previewAction'), t('profile.previewActionMsg'));
+      return;
+    }
+    showAlert(t('profile.deleteAccountTitle'), t('profile.deleteAccountMsg'), [
+      { text: t('app.cancel'), style: 'cancel' },
+      {
+        text: t('profile.deleteAccountConfirm'),
+        style: 'destructive',
+        onPress: () => Linking.openURL('https://fonolog-site.vercel.app/account-deletion').catch(() => {}),
+      },
+    ]);
+  };
+
   return (
     <Screen>
       <Text style={styles.title}>{t('profile.title')}</Text>
@@ -189,6 +204,10 @@ export default function ProfileTab() {
         <Ionicons name="log-out-outline" size={20} color={theme.colors.feedback.errorText} />
         <Text style={styles.signOutText}>{t('profile.signOut')}</Text>
       </Pressable>
+
+      <Pressable onPress={onDeleteAccount} style={styles.deleteAccount}>
+        <Text style={styles.deleteAccountText}>{t('profile.deleteAccount')}</Text>
+      </Pressable>
     </Screen>
   );
 }
@@ -241,4 +260,15 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing[2],
   },
   signOutText: { ...theme.typography.bodyMedium, color: theme.colors.feedback.errorText },
+  deleteAccount: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing[3],
+    marginTop: theme.spacing[1],
+  },
+  deleteAccountText: {
+    ...theme.typography.caption,
+    color: theme.colors.feedback.errorText,
+    textDecorationLine: 'underline',
+  },
 });

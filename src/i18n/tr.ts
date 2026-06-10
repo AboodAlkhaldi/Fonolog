@@ -323,6 +323,10 @@ const tr = {
     settings:        'Ayarlar',
     signOut:         'Çıkış Yap',
     signOutConfirm:  'Hesabından çıkmak istediğinden emin misin?',
+    deleteAccount:        'Hesabımı Sil',
+    deleteAccountTitle:   'Hesabını silmek istiyor musun?',
+    deleteAccountMsg:     'Bu işlem geri alınamaz. Hesabın ve tüm verilerin (ilerleme, karakter, abonelik bilgisi) kalıcı olarak silinecektir. Devam etmek için seni web sitemize yönlendireceğiz; işlemi oradan tamamlayabilirsin.',
+    deleteAccountConfirm: 'Devam Et',
   },
 
   // ─── Settings screens (admin / teacher / shared) ───
