@@ -10,6 +10,7 @@ expo-env.d.ts
 .md
 expo-env.d.ts
 fonoloji-atölyesi (2).html
+fonolog-f1931dd470b8.json
 
 # macOS
 .DS_Store
@@ -21,6 +22,10 @@ fonoloji-atölyesi (2).html
 *.key
 *.mobileprovision
 *.orig.*
+
+# Google Play / service account credentials — never commit
+google-play-service-account.json
+*-service-account.json
 
 # Metro
 .metro-health-check*
