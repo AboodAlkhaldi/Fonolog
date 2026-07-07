@@ -3,15 +3,12 @@ import { View, Text, StyleSheet, Pressable, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { differenceInCalendarDays } from 'date-fns';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 
 import { Screen } from '@/components';
 import { useAuth } from '@/store/auth';
 import { supabase } from '@/lib/supabase';
 import { withPreviewPlaceholders } from '@/lib/preview-profile';
 import { showAlert } from '@/store/alert';
-import { checkUsage, recordUsage } from '@/lib/entitlements';
 import { subscriptionLabel } from '@/lib/access-tier';
 import { TEACHER_MODULE_ENABLED } from '@/domain/feature-flags';
 import { theme } from '@/theme';
@@ -44,49 +41,6 @@ export default function ProfileTab() {
   const expires = profile.subscription_expires ? new Date(profile.subscription_expires) : null;
   const trialDays = expires && profile.subscription_status === 'trial'
     ? Math.max(0, differenceInCalendarDays(expires, new Date())) : null;
-
-  const onGenerateOwnPdf = async () => {
-    if (impersonating) {
-      showAlert(t('profile.previewAction'), t('profile.previewActionMsg'));
-      return;
-    }
-    const usage = await checkUsage(realProfile, 'pdf_student');
-    if (!usage.allowed) {
-      showAlert(
-        t('profile.pdfQuotaTitle'),
-        t('profile.pdfQuotaMsg', { limit: usage.limit }),
-        [
-          { text: t('app.cancel'), style: 'cancel' },
-          { text: t('profile.pdfUpgradeBtn'), onPress: () => router.push('/paywall') },
-        ],
-      );
-      return;
-    }
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-pdf-report`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ student_id: realProfile?.id }),
-      });
-      if (!res.ok) { showAlert(t('app.error_title'), await res.text()); return; }
-      const { html } = await res.json();
-      const { uri } = await Print.printToFileAsync({ html });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
-      }
-      await recordUsage(realProfile, 'pdf_student');
-      const after = await checkUsage(realProfile, 'pdf_student');
-      if (after.limit > 0 && after.remaining >= 0) {
-        showAlert(t('app.ok'), t('profile.pdfSuccess', { remaining: after.remaining, limit: after.limit }));
-      }
-    } catch (e) {
-      showAlert(t('app.error_title'), t('profile.pdfError', { error: e instanceof Error ? e.message : String(e) }));
-    }
-  };
 
   const onResetPassword = () => {
     if (impersonating) return;
@@ -159,13 +113,13 @@ export default function ProfileTab() {
         )}
       </Pressable>
 
-      {/* PDF Report */}
-      <Pressable style={styles.card} onPress={onGenerateOwnPdf}>
+      {/* Reports */}
+      <Pressable style={styles.card} onPress={() => router.push('/settings/reports' as any)}>
         <View style={styles.cardHeaderRow}>
-          <Text style={styles.cardTitle}>{t('profile.pdfReport')}</Text>
+          <Text style={styles.cardTitle}>{t('profile.reports')}</Text>
           <Ionicons name="chevron-forward" size={18} color={theme.colors.text.muted} />
         </View>
-        <Text style={styles.cardDesc}>{t('profile.pdfReportDesc')}</Text>
+        <Text style={styles.cardDesc}>{t('profile.reportsDesc')}</Text>
       </Pressable>
 
       {/* Linked teachers — only when the teacher module is enabled. */}

@@ -200,6 +200,19 @@ export interface TeacherNoteRow {
   updated_at:        string;
 }
 
+export interface ReportRow {
+  id:              string;
+  user_id:         string;
+  created_by:      string | null;
+  title:           string;
+  file_name:       string;
+  file_path:       string;
+  file_url:        string | null;
+  mime_type:       string;
+  size_bytes:      number | null;
+  created_at:      string;
+}
+
 export interface CouponRow {
   id:               string;
   code:             string;   // case-sensitive promo code
@@ -248,6 +261,7 @@ export interface Database {
       homeworks:               { Row: HomeworkRow;               Insert: Partial<HomeworkRow>;               Update: Partial<HomeworkRow>;               Relationships: [] };
       notifications:           { Row: NotificationRow;           Insert: Partial<NotificationRow>;           Update: Partial<NotificationRow>;           Relationships: [] };
       teacher_notes:           { Row: TeacherNoteRow;            Insert: Partial<TeacherNoteRow>;            Update: Partial<TeacherNoteRow>;            Relationships: [] };
+      reports:                 { Row: ReportRow;                 Insert: Partial<ReportRow>;                 Update: Partial<ReportRow>;                 Relationships: [] };
       coupons:                 { Row: CouponRow;                 Insert: Partial<CouponRow>;                 Update: Partial<CouponRow>;                 Relationships: [] };
       coupon_redemptions:      { Row: CouponRedemptionRow;       Insert: Partial<CouponRedemptionRow>;       Update: Partial<CouponRedemptionRow>;       Relationships: [] };
     };

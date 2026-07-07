@@ -4,14 +4,13 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system/legacy';
-import { FileSystemUploadType } from 'expo-file-system/legacy';
 
 import { Screen, Loading, Button, Badge, Input } from '@/components';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/store/alert';
 import { checkUsage, recordUsage } from '@/lib/entitlements';
+import { storeGeneratedReportPdf, getReportUrl } from '@/lib/reports';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
@@ -155,38 +154,27 @@ export default function TeacherStudentDetail() {
         }),
       });
       if (!res.ok) { showAlert(t('app.error_title'), await res.text()); return; }
-      const { html } = await res.json();
+      const { html, report } = await res.json();
 
       const { uri } = await Print.printToFileAsync({ html });
 
-      // Upload to Supabase Storage via native HTTP (avoids Blob/ArrayBuffer issues in RN).
-      const dateStr = new Date().toISOString().split('T')[0];
-      const path = `${teacherProfile?.id}/${id}-${dateStr}-${Date.now()}.pdf`;
-      const uploadUrl = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/reports/${path}`;
-      const uploadResult = await FileSystem.uploadAsync(uploadUrl, uri, {
-        httpMethod: 'POST',
-        uploadType: FileSystemUploadType.BINARY_CONTENT,
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/pdf',
-          'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
-        },
+      const savedReport = await storeGeneratedReportPdf({
+        pdfUri: uri,
+        ownerId: id,
+        createdById: teacherProfile?.id,
+        title: report?.title ?? `${profile.full_name} · ${t('reports.title')}`,
+        fileNamePrefix: report?.fileNamePrefix ?? `${profile.full_name}-report`,
+        accessToken: session?.access_token ?? '',
       });
 
-      let publicUrl: string | null = null;
-      if (uploadResult.status >= 200 && uploadResult.status < 300) {
-        const { data } = supabase.storage.from('reports').getPublicUrl(path);
-        publicUrl = data.publicUrl;
-        await supabase.from('notifications').insert({
-          user_id: id,
-          type:    'teacher_note',
-          title:   t('teacher.studentDetail.pdfNotifTitle'),
-          body:    t('teacher.studentDetail.pdfNotifBody'),
-          payload: { report_url: publicUrl, teacher_id: teacherProfile?.id, has_notes: !!teacherNotes },
-        });
-      } else {
-        console.warn('[pdf] upload failed', uploadResult.status, uploadResult.body);
-      }
+      const publicUrl = savedReport.file_url ?? getReportUrl(savedReport);
+      await supabase.from('notifications').insert({
+        user_id: id,
+        type:    'teacher_note',
+        title:   t('teacher.studentDetail.pdfNotifTitle'),
+        body:    t('teacher.studentDetail.pdfNotifBody'),
+        payload: { report_url: publicUrl, report_id: savedReport.id, teacher_id: teacherProfile?.id, has_notes: !!teacherNotes },
+      });
 
       await recordUsage(teacherProfile, 'pdf_teacher');
 
@@ -264,34 +252,39 @@ export default function TeacherStudentDetail() {
         animationType="slide"
         onRequestClose={() => !generating && setNotesOpen(false)}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <ScrollView keyboardShouldPersistTaps="handled">
-              <Text style={styles.modalTitle}>{t('teacher.studentDetail.notesTitle')}</Text>
-              <Text style={styles.modalSubtitle}>{t('teacher.studentDetail.notesSubtitle')}</Text>
-              <Input
-                value={teacherNotes}
-                onChangeText={setTeacherNotes}
-                placeholder={t('teacher.studentDetail.notesPlaceholder')}
-                multiline
-                numberOfLines={6}
+        <Pressable style={styles.modalBackdrop} onPress={() => !generating && setNotesOpen(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>{t('teacher.studentDetail.notesTitle')}</Text>
+            <Text style={styles.modalSubtitle}>{t('teacher.studentDetail.notesSubtitle')}</Text>
+            <Input
+              value={teacherNotes}
+              onChangeText={setTeacherNotes}
+              placeholder={t('teacher.studentDetail.notesPlaceholder')}
+              multiline
+              numberOfLines={5}
+              editable={!generating}
+              containerStyle={{ marginBottom: theme.spacing[3] }}
+            />
+            <View style={styles.modalActions}>
+              <Button
+                label={t('app.cancel')}
+                variant="secondary"
+                fullWidth
+                onPress={() => setNotesOpen(false)}
+                disabled={generating}
+                style={{ flex: 1 }}
               />
               <Button
                 label={t('teacher.studentDetail.notesSubmit')}
-                variant="cta" size="lg" fullWidth
-                loading={generating}
+                variant="cta"
+                fullWidth
                 onPress={onGenerateReport}
-                style={{ marginTop: theme.spacing[3] }}
+                loading={generating}
+                style={{ flex: 1 }}
               />
-              <Button
-                label={t('app.cancel')}
-                variant="ghost" size="md" fullWidth
-                onPress={() => !generating && setNotesOpen(false)}
-                style={{ marginTop: theme.spacing[2] }}
-              />
-            </ScrollView>
-          </View>
-        </View>
+            </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </Screen>
   );
@@ -349,4 +342,5 @@ const styles = StyleSheet.create({
   },
   modalTitle: { ...theme.typography.h2, color: theme.colors.text.primary, marginBottom: theme.spacing[1] },
   modalSubtitle: { ...theme.typography.bodySmall, color: theme.colors.text.muted, marginBottom: theme.spacing[3] },
+  modalActions: { flexDirection: 'row', gap: theme.spacing[2] },
 });

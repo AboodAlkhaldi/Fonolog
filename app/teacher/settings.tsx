@@ -104,6 +104,12 @@ export default function TeacherSettings() {
         <Ionicons name="chevron-forward" size={16} color={theme.colors.text.muted} />
       </Pressable>
 
+      <Pressable onPress={() => router.push('/settings/reports' as any)} style={styles.actionRow}>
+        <Ionicons name="document-outline" size={20} color={theme.colors.text.secondary} />
+        <Text style={styles.actionText}>{t('settings.reports')}</Text>
+        <Ionicons name="chevron-forward" size={16} color={theme.colors.text.muted} />
+      </Pressable>
+
       <Pressable onPress={onResetPassword} style={styles.actionRow}>
         <Ionicons name="key-outline" size={20} color={theme.colors.text.secondary} />
         <Text style={styles.actionText}>{t('auth.deactivate.resetPasswordBtn')}</Text>
