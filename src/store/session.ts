@@ -17,7 +17,7 @@ import { supabase } from '@/lib/supabase';
 import { getAccessTier, maxWordsForTier } from '@/lib/access-tier';
 import {
   loadDayProgress,
-  canPlayModule,
+  getModuleLockReason,
   markModuleComplete,
   DAY_COMPLETION_MIN_ACCURACY,
 } from '@/lib/day-progress';
@@ -174,16 +174,28 @@ export const useSession = create<SessionState>((set, get) => ({
           // student's daily curriculum progression.
           if (tier !== 'free') {
             const dayProgress = profile ? await loadDayProgress(profile.id) : null;
-            if (!dayProgress || !canPlayModule(profile, dayProgress, moduleId)) {
-              set({ status: 'locked', errorMessage: 'Ödevi açmadan önce bugünün oyunlarını tamamla.' });
+            const lockReason = dayProgress ? getModuleLockReason(profile, dayProgress, moduleId) : 'day';
+            if (!dayProgress || lockReason) {
+              set({
+                status: 'locked',
+                errorMessage: lockReason === 'plan'
+                  ? 'Bu oyunu planın nedeniyle açamıyorsun. Tüm oyunlara erişmek için Pro’ya geç.'
+                  : 'Ödevi açmadan önce bugünün oyunlarını tamamla.',
+              });
               return;
             }
           }
         } else {
           // Normal (non-assignment) launches: standard day-progress gate.
           const dayProgress = profile ? await loadDayProgress(profile.id) : null;
-          if (!dayProgress || !canPlayModule(profile, dayProgress, moduleId)) {
-            set({ status: 'locked', errorMessage: 'Önce bugünün oyunlarını bitir.' });
+          const lockReason = dayProgress ? getModuleLockReason(profile, dayProgress, moduleId) : 'day';
+          if (!dayProgress || lockReason) {
+            set({
+              status: 'locked',
+              errorMessage: lockReason === 'plan'
+                ? 'Bu oyunu planın nedeniyle açamıyorsun. Tüm oyunlara erişmek için Pro’ya geç.'
+                : 'Önce bugünün oyunlarını bitir.',
+            });
             return;
           }
         }

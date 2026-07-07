@@ -12,6 +12,8 @@ import {
   loadDayProgress,
   effectiveDay,
   canPlayModule,
+  getModuleLockReason,
+  EMPTY_PROGRESS,
   todayDoneSet,
   type DayProgress,
 } from '@/lib/day-progress';
@@ -73,10 +75,10 @@ export default function LearnTab() {
     return true; // admin / subscribed / trial
   };
 
-  const showLocked = () => {
+  const showLocked = (reason: 'plan' | 'day') => {
     // Free users (and teachers in free preview) cannot unlock by finishing —
     // they have to upgrade. Other tiers see the "finish today's games" copy.
-    if (tier === 'free') {
+    if (reason === 'plan') {
       showAlert(
         t('day.lockedProTitle'),
         t('day.lockedProMsg'),
@@ -93,22 +95,24 @@ export default function LearnTab() {
   const launch = (m: ModuleDefinition) => {
     if (impersonating) {
       if (!isPlayableInPreview(m)) {
-        showLocked();
+        showLocked('plan');
         return;
       }
-      router.push(`/session/${m.id}` as any);
+      router.push({ pathname: '/session/intro', params: { moduleId: m.id } } as any);
       return;
     }
     if (ALWAYS_OPEN_MODULES.includes(m.id)) {
-      router.push(`/session/${m.id}` as any);
+      router.push({ pathname: '/session/intro', params: { moduleId: m.id } } as any);
       return;
     }
-    if (!dayProgress) return;
-    if (!canPlayModule(realProfile as any, dayProgress, m.id)) {
-      showLocked();
+    if (!dayProgress && tier !== 'free') return;
+    const progress = dayProgress ?? EMPTY_PROGRESS;
+    const lockReason = getModuleLockReason(realProfile as any, progress, m.id);
+    if (lockReason) {
+      showLocked(lockReason === 'plan' ? 'plan' : 'day');
       return;
     }
-    router.push(`/session/${m.id}` as any);
+    router.push({ pathname: '/session/intro', params: { moduleId: m.id } } as any);
   };
 
   return (

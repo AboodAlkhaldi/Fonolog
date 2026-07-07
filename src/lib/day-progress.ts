@@ -117,6 +117,32 @@ export function canPlayModule(
   return true;
 }
 
+export type ModuleLockReason = 'plan' | 'day' | null;
+
+/** Returns why a module is locked, or null if it is playable. */
+export function getModuleLockReason(
+  profile: Profile | null,
+  progress: DayProgress,
+  moduleId: string,
+): ModuleLockReason {
+  if (!profile) return 'day';
+  if (profile.role === 'admin') return null;
+  if (ALWAYS_OPEN_MODULES.includes(moduleId)) return null;
+
+  const tier = getAccessTier(profile as any);
+  const day = effectiveDay(tier, progress);
+  const todayGames = DAY_CURRICULUM[day] ?? [];
+
+  if (todayGames.includes(moduleId)) return null;
+  if (tier === 'free') return 'plan';
+  if (!isDayComplete(progress, day)) return 'day';
+  if (tier === 'trial') {
+    const peek = DAY_CURRICULUM[nextDay(day)] ?? [];
+    return peek.includes(moduleId) ? null : 'day';
+  }
+  return null;
+}
+
 /** Returns the curriculum for the student's currently-active day (after tier clamp). */
 export function getTodayGames(profile: Profile | null, progress: DayProgress): readonly string[] {
   if (!profile) return [];
